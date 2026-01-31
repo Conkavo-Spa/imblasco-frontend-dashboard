@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+    --im-bg: #370776;
+    --im-accent: #5DD62C;
+    --im-accent-strong: #49c61d;
+    --im-soft: #f6f2ff;
+    --im-text: #121027;
+    --im-text-muted: #6b6885;
+    --im-card: #ffffff;
+    --im-glow: rgba(93, 214, 44, 0.38);
+    --im-glow-2: rgba(55, 7, 118, 0.35);
+}
+
+html,
+body,
+#root {
+    height: 100%;
+}
+
+body {
+    font-family: Poppins, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Apple Color Emoji",
+        "Segoe UI Emoji";
+    color: var(--im-text);
+    background:
+        radial-gradient(900px 520px at 10% 10%, rgba(93, 214, 44, 0.18), transparent 60%),
+        radial-gradient(780px 480px at 90% 15%, rgba(255, 255, 255, 0.18), transparent 55%),
+        radial-gradient(900px 650px at 50% 110%, var(--im-glow-2), transparent 55%),
+        linear-gradient(180deg, #2a055a 0%, var(--im-bg) 55%, #21034a 100%);
+}
+
+/* Ant Design: make "primary" feel like our brand */
+.ant-btn-primary {
+    background: var(--im-accent) !important;
+    border-color: var(--im-accent) !important;
+    color: #061b00 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 12px 30px rgba(93, 214, 44, 0.22) !important;
+}
+
+.ant-btn-primary:hover {
+    background: var(--im-accent-strong) !important;
+    border-color: var(--im-accent-strong) !important;
+}
+
+.ant-btn-primary:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 4px var(--im-glow), 0 12px 30px rgba(93, 214, 44, 0.22) !important;
+}
+
+/* Ant Design Menu/Sider: branded purple */
+.ant-layout-sider,
+.ant-layout-sider-children,
+.ant-menu.ant-menu-dark {
+    background: var(--im-bg) !important;
+}
+
+.ant-menu.ant-menu-dark .ant-menu-item-selected {
+    background: rgba(93, 214, 44, 0.14) !important;
+    border-left: 3px solid var(--im-accent) !important;
+}
+
+.ant-menu.ant-menu-dark .ant-menu-item-selected a,
+.ant-menu.ant-menu-dark .ant-menu-item-selected span,
+.ant-menu.ant-menu-dark .ant-menu-item-selected svg {
+    color: #ffffff !important;
+}
+
+.ant-menu.ant-menu-dark .ant-menu-item a,
+.ant-menu.ant-menu-dark .ant-menu-item span,
+.ant-menu.ant-menu-dark .ant-menu-item svg {
+    color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.ant-menu.ant-menu-dark .ant-menu-item:hover {
+    background: rgba(255, 255, 255, 0.08) !important;
+}
