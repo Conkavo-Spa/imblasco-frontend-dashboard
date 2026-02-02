@@ -113,14 +113,14 @@ const Mails = () => {
 
     const columns = [
         {
-            title: 'Asunto',
+            title: <span className="whitespace-nowrap">Asunto</span>,
             dataIndex: 'subject',
             key: 'subject',
             ellipsis: true,
             render: (val) => val || '—',
         },
         {
-            title: 'Cliente',
+            title: <span className="whitespace-nowrap">Cliente</span>,
             key: 'customer',
             width: 200,
             ellipsis: true,
@@ -136,7 +136,7 @@ const Mails = () => {
             },
         },
         {
-            title: 'Último mensaje',
+            title: <span className="whitespace-nowrap">Último mensaje</span>,
             key: 'preview',
             ellipsis: true,
             render: (_, record) => {
@@ -145,32 +145,32 @@ const Mails = () => {
             },
         },
         {
-            title: 'Fecha',
+            title: <span className="whitespace-nowrap">Fecha</span>,
             key: 'lastMessageAt',
             width: 140,
             render: (_, record) => formatDate(record.summary?.lastMessageAt),
         },
         {
-            title: 'Mensajes',
+            title: <span className="whitespace-nowrap">Mensajes</span>,
             key: 'messageCount',
             width: 90,
             align: 'center',
             render: (_, record) => record.summary?.messageCount ?? 0,
         },
         {
-            title: 'Clasificación',
+            title: <span className="whitespace-nowrap">Clasificación</span>,
             key: 'classification',
             width: 150,
             render: (_, record) => humanizeDict(CLASIFICACIONES, record.clasificacion),
         },
         {
-            title: 'Acción',
+            title: <span className="whitespace-nowrap">Acción</span>,
             key: 'action',
             width: 110,
             render: (_, record) => humanizeDict(ACTIONS, record.accion),
         },
         {
-            title: 'Estado',
+            title: <span className="whitespace-nowrap">Estado</span>,
             key: 'state',
             width: 110,
             render: (_, record) => {
@@ -189,7 +189,7 @@ const Mails = () => {
             },
         },
         {
-            title: 'Detalle',
+            title: <span className="whitespace-nowrap">Detalle</span>,
             key: 'actions',
             width: 110,
             align: 'center',
@@ -300,6 +300,8 @@ const Mails = () => {
                             pagination={{ pageSize: itemsPerPage }}
                             bordered
                             tableLayout="fixed"
+                            size="small"
+                            className="text-[12px]"
                             rowKey="_id"
                         />
                     ) : (

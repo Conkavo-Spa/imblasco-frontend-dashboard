@@ -65,14 +65,14 @@ const Chat = () => {
 
     const columns = [
         {
-            title: 'Cliente',
+            title: <span className="whitespace-nowrap">Cliente</span>,
             key: 'customer',
             width: 160,
             ellipsis: true,
             render: () => 'No identificado',
         },
         {
-            title: 'Último mensaje',
+            title: <span className="whitespace-nowrap">Último mensaje</span>,
             key: 'preview',
             ellipsis: true,
             render: (_, record) => {
@@ -81,20 +81,20 @@ const Chat = () => {
             },
         },
         {
-            title: 'Fecha',
+            title: <span className="whitespace-nowrap">Fecha</span>,
             key: 'lastMessageAt',
             width: 140,
             render: (_, record) => formatDate(record.summary?.lastMessageAt),
         },
         {
-            title: 'Mensajes',
+            title: <span className="whitespace-nowrap">Mensajes</span>,
             key: 'messageCount',
             width: 90,
             align: 'center',
             render: (_, record) => record.summary?.messageCount ?? 0,
         },
         {
-            title: 'Detalle',
+            title: <span className="whitespace-nowrap">Detalle</span>,
             key: 'actions',
             width: 110,
             align: 'center',
@@ -141,6 +141,8 @@ const Chat = () => {
                             pagination={{ pageSize: itemsPerPage }}
                             bordered
                             tableLayout="fixed"
+                            size="small"
+                            className="text-[12px]"
                             rowKey="_id"
                         />
                     ) : (
