@@ -173,6 +173,7 @@ const Mails = () => {
             title: <span className="whitespace-nowrap">Estado</span>,
             key: 'state',
             width: 110,
+            ellipsis: true,
             render: (_, record) => {
                 const stRaw = record.estado || record.status?.state;
                 const st = humanizeDict(THREAD_STATES, stRaw);
@@ -182,9 +183,15 @@ const Mails = () => {
                         : stRaw === 'ERROR' ? 'red'
                             : 'blue';
                 return (
-                    <Tag color={color}>
-                        {st}
-                    </Tag>
+                    <div className="max-w-full overflow-hidden">
+                        <Tag
+                            color={color}
+                            className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap align-middle"
+                            style={{ maxWidth: '100%', display: 'inline-block' }}
+                        >
+                            {st}
+                        </Tag>
+                    </div>
                 );
             },
         },
@@ -197,7 +204,7 @@ const Mails = () => {
                 <Button
                     type="primary"
                     size="small"
-                    style={{ maxWidth: '100%' }}
+                    style={{ width: '100%', maxWidth: '100%' }}
                     onClick={() => navigate(`/mails/${String(record._id)}`, { state: { conversation: record } })}
                 >
                     Detalle
