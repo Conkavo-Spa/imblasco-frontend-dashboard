@@ -1,20 +1,19 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Sidebar from '../../components/Sidebar';
 import {
     Table,
     Input,
+    DatePicker,
+    Select,
     Card,
     Pagination,
     Empty,
     Button,
     Tag,
 } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
 import useEmailConversations from '../../hooks/useEmailConversations';
 import { useMediaQuery } from 'react-responsive';
 import { useNavigate } from 'react-router-dom';
-
-const { Search } = Input;
 
 // Diccionarios para valores "técnicos" → texto amigable
 const CLASIFICACIONES = {
@@ -46,6 +45,22 @@ const humanizeDict = (dict, value) => {
     return dict[v] || v;
 };
 
+const toYMD = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '';
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    if (typeof value === 'object' && typeof value.format === 'function') {
+        // AntD DatePicker returns a Dayjs instance by default
+        return value.format('YYYY-MM-DD');
+    }
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
 const formatDate = (date) => {
     if (!date) return '—';
     const d = new Date(date);
@@ -56,8 +71,11 @@ const formatDate = (date) => {
 };
 
 const Mails = () => {
-    const [searchText, setSearchText] = useState('');
-    const [filteredData, setFilteredData] = useState([]);
+    const [emailQuery, setEmailQuery] = useState('');
+    const [dateFilter, setDateFilter] = useState(null);
+    const [clasificacionFilter, setClasificacionFilter] = useState('');
+    const [accionFilter, setAccionFilter] = useState('');
+    const [estadoFilter, setEstadoFilter] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
 
     const isMobile = useMediaQuery({ maxWidth: 768 });
@@ -66,7 +84,26 @@ const Mails = () => {
     const { data, isLoading } = useEmailConversations({ page: 1, limit: 100 });
 
     const conversations = data?.data?.docs ?? [];
-    const dataToRender = searchText ? filteredData : conversations;
+    const dataToRender = useMemo(() => {
+        const qEmail = String(emailQuery || '').trim().toLowerCase();
+        const targetYmd = toYMD(dateFilter);
+
+        return conversations.filter((item) => {
+            const customerEmail = String(item.participants?.customer?.email || '').toLowerCase();
+            const clasificacionRaw = String(item.clasificacion || '').trim();
+            const accionRaw = String(item.accion || '').trim();
+            const estadoRaw = String(item.estado || item.status?.state || '').trim();
+            const itemYmd = toYMD(item.summary?.lastMessageAt);
+
+            if (qEmail && !customerEmail.includes(qEmail)) return false;
+            if (targetYmd && (!itemYmd || itemYmd !== targetYmd)) return false;
+            if (clasificacionFilter && clasificacionRaw !== clasificacionFilter) return false;
+            if (accionFilter && accionRaw !== accionFilter) return false;
+            if (estadoFilter && estadoRaw !== estadoFilter) return false;
+
+            return true;
+        });
+    }, [conversations, emailQuery, dateFilter, clasificacionFilter, accionFilter, estadoFilter]);
 
     const itemsPerPage = 5;
     const paginatedData = dataToRender.slice(
@@ -169,29 +206,6 @@ const Mails = () => {
         },
     ];
 
-    const handleBuscar = (value) => {
-        setCurrentPage(1);
-        setSearchText(value || '');
-        if (!value?.trim()) {
-            setFilteredData([]);
-            return;
-        }
-        const q = value.toLowerCase().trim();
-        const filtered = conversations.filter((item) => {
-            const subject = (item.subject || '').toLowerCase();
-            const customerName = (item.participants?.customer?.name || '').toLowerCase();
-            const customerEmail = (item.participants?.customer?.email || '').toLowerCase();
-            const preview = (item.summary?.lastMessagePreview || '').toLowerCase();
-            return (
-                subject.includes(q) ||
-                customerName.includes(q) ||
-                customerEmail.includes(q) ||
-                preview.includes(q)
-            );
-        });
-        setFilteredData(filtered);
-    };
-
     return (
         <div className="flex h-screen bg-[#f6f2ff] overflow-hidden">
             <Sidebar />
@@ -200,15 +214,81 @@ const Mails = () => {
                     <h1 className="text-3xl font-extrabold text-[#370776]">Mails</h1>
                 </div>
 
-                <div className="mb-6">
-                    <Search
-                        placeholder="Buscar por asunto, cliente o mensaje..."
-                        allowClear
-                        enterButton={<SearchOutlined />}
-                        size="large"
-                        onSearch={handleBuscar}
-                        onChange={(e) => handleBuscar(e.target.value)}
-                    />
+                <div className="mb-6 flex flex-col gap-3">
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <Input
+                            placeholder="Correo del cliente"
+                            allowClear
+                            value={emailQuery}
+                            onChange={(e) => {
+                                setCurrentPage(1);
+                                setEmailQuery(e.target.value);
+                            }}
+                            className="w-full sm:w-[320px]"
+                        />
+
+                        <DatePicker
+                            placeholder="Fecha"
+                            allowClear
+                            value={dateFilter}
+                            onChange={(val) => {
+                                setCurrentPage(1);
+                                setDateFilter(val);
+                            }}
+                            className="w-full sm:w-[220px]"
+                        />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <Select
+                            allowClear
+                            value={clasificacionFilter || undefined}
+                            placeholder="Clasificación"
+                            className="w-full sm:w-[260px]"
+                            onChange={(val) => {
+                                setCurrentPage(1);
+                                setClasificacionFilter(val || '');
+                            }}
+                            options={Object.entries(CLASIFICACIONES).map(([value, label]) => ({ value, label }))}
+                        />
+
+                        <Select
+                            allowClear
+                            value={accionFilter || undefined}
+                            placeholder="Acción"
+                            className="w-full sm:w-[220px]"
+                            onChange={(val) => {
+                                setCurrentPage(1);
+                                setAccionFilter(val || '');
+                            }}
+                            options={Object.entries(ACTIONS).map(([value, label]) => ({ value, label }))}
+                        />
+
+                        <Select
+                            allowClear
+                            value={estadoFilter || undefined}
+                            placeholder="Estado"
+                            className="w-full sm:w-[220px]"
+                            onChange={(val) => {
+                                setCurrentPage(1);
+                                setEstadoFilter(val || '');
+                            }}
+                            options={Object.entries(THREAD_STATES).map(([value, label]) => ({ value, label }))}
+                        />
+
+                        <Button
+                            onClick={() => {
+                                setCurrentPage(1);
+                                setEmailQuery('');
+                                setDateFilter(null);
+                                setClasificacionFilter('');
+                                setAccionFilter('');
+                                setEstadoFilter('');
+                            }}
+                        >
+                            Limpiar
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="overflow-x-auto">

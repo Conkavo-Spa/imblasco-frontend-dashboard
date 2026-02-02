@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Sidebar from '../../components/Sidebar';
 import {
     Table,
@@ -6,11 +6,28 @@ import {
     Pagination,
     Empty,
     Button,
+    DatePicker,
 } from 'antd';
 // icon removed to fit column width
 import useConversations from '../../hooks/useConversations';
 import { useMediaQuery } from 'react-responsive';
 import { useNavigate } from 'react-router-dom';
+
+const toYMD = (value) => {
+    if (!value) return '';
+    if (typeof value === 'string') {
+        const d = new Date(value);
+        if (Number.isNaN(d.getTime())) return '';
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    if (typeof value === 'object' && typeof value.format === 'function') {
+        // AntD DatePicker returns a Dayjs instance by default
+        return value.format('YYYY-MM-DD');
+    }
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 const formatDate = (date) => {
     if (!date) return '—';
@@ -23,6 +40,7 @@ const formatDate = (date) => {
 
 const Chat = () => {
     const [currentPage, setCurrentPage] = useState(1);
+    const [dateFilter, setDateFilter] = useState(null);
 
     const isMobile = useMediaQuery({ maxWidth: 768 });
     const navigate = useNavigate();
@@ -30,7 +48,14 @@ const Chat = () => {
     const { data, isLoading } = useConversations({ channel: 'chat', page: 1, limit: 100 });
 
     const conversations = data?.data?.docs ?? [];
-    const dataToRender = conversations;
+    const dataToRender = useMemo(() => {
+        const target = toYMD(dateFilter);
+        if (!target) return conversations;
+        return conversations.filter((item) => {
+            const ymd = toYMD(item.summary?.lastMessageAt);
+            return !!ymd && ymd === target;
+        });
+    }, [conversations, dateFilter]);
 
     const itemsPerPage = 5;
     const paginatedData = dataToRender.slice(
@@ -92,6 +117,19 @@ const Chat = () => {
             <div className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto overflow-x-auto pb-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-extrabold text-[#370776]">Chats</h1>
+                </div>
+
+                <div className="mb-6 flex flex-col sm:flex-row gap-3">
+                    <DatePicker
+                        placeholder="Filtrar por fecha"
+                        allowClear
+                        className="w-full sm:w-[240px]"
+                        onChange={(val) => {
+                            setCurrentPage(1);
+                            setDateFilter(val);
+                        }}
+                        value={dateFilter}
+                    />
                 </div>
 
                 <div className="overflow-x-auto">
