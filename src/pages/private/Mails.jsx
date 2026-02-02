@@ -136,15 +136,6 @@ const Mails = () => {
             },
         },
         {
-            title: <span className="whitespace-nowrap">Último mensaje</span>,
-            key: 'preview',
-            ellipsis: true,
-            render: (_, record) => {
-                const preview = record.summary?.lastMessagePreview;
-                return preview ? `${preview.slice(0, 60)}${preview.length > 60 ? '…' : ''}` : '—';
-            },
-        },
-        {
             title: <span className="whitespace-nowrap">Fecha</span>,
             key: 'lastMessageAt',
             width: 140,
@@ -331,11 +322,6 @@ const Mails = () => {
                                                             ({conv.participants.customer.email})
                                                         </span>
                                                     )}
-                                                </p>
-                                                <p>
-                                                    <b>Último mensaje:</b>{' '}
-                                                    {(conv.summary?.lastMessagePreview || '—').slice(0, 80)}
-                                                    {(conv.summary?.lastMessagePreview?.length || 0) > 80 ? '…' : ''}
                                                 </p>
                                                 <p>
                                                     <b>Fecha:</b> {formatDate(conv.summary?.lastMessageAt)}
