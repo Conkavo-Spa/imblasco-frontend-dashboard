@@ -24,7 +24,7 @@ function App() {
           <Route path="/fine-tuning" element={<FineTuning />} />
           <Route path="/ajustes" element={<Ajustes />} />
         </Route>
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/mails" replace />} />
       </Routes>
     </Router>
   );

@@ -29,7 +29,7 @@ const Login = () => {
             if (values.mail === HARDCODED_USER.email && values.password === HARDCODED_USER.password) {
                 message.success('Inicio de sesión exitoso');
                 localStorage.setItem('user', JSON.stringify(HARDCODED_USER));
-                navigate('/dashboard');
+                navigate('/mails');
             } else {
                 message.error('Credenciales incorrectas');
             }
@@ -70,7 +70,7 @@ const Login = () => {
                     >
                         <Input
                             placeholder="Correo"
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:!border-[#5DD62C] focus:!shadow-[0_0_0_4px_rgba(93,214,44,0.16)]"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#5DD62C]! focus:shadow-[0_0_0_4px_rgba(93,214,44,0.16)]!"
                         />
                     </Form.Item>
 
@@ -80,7 +80,7 @@ const Login = () => {
                     >
                         <Input.Password
                             placeholder="Contraseña"
-                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:!border-[#5DD62C] focus:!shadow-[0_0_0_4px_rgba(93,214,44,0.16)]"
+                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-[#5DD62C]! focus:shadow-[0_0_0_4px_rgba(93,214,44,0.16)]!"
                         />
                     </Form.Item>
 
@@ -89,7 +89,7 @@ const Login = () => {
                             type="primary"
                             htmlType="submit"
                             loading={loading}
-                            className="w-full py-6 text-base rounded-xl !bg-[#5DD62C] hover:!bg-[#49c61d] !border-none !text-[#061b00] shadow-[0_14px_40px_rgba(93,214,44,0.22)]"
+                            className="w-full py-6 text-base rounded-xl bg-[#5DD62C]! hover:bg-[#49c61d]! border-none! text-[#061b00]! shadow-[0_14px_40px_rgba(93,214,44,0.22)]"
                         >
                             Iniciar Sesión
                         </Button>
