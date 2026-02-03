@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './pages/public/Login';
 import Dashboard from './pages/private/Dashboard';
@@ -9,6 +9,32 @@ import ChatThread from './pages/private/ChatThread';
 import FineTuning from './pages/private/FineTuning';
 import Ajustes from './pages/private/Ajustes';
 import PrivateRoute from './components/PrivateRoute';
+
+const LAST_PATH_KEY = 'app_last_private_path';
+
+// Guarda la ruta actual (salvo login) para poder restaurar tras reload cuando el servidor devuelve /
+function PersistLastPath() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (pathname && pathname !== '/login') {
+      try {
+        sessionStorage.setItem(LAST_PATH_KEY, pathname);
+      } catch (_) { }
+    }
+  }, [pathname]);
+  return null;
+}
+
+// Si cargamos en / (p. ej. reload en Render que no conserva la ruta), restaurar última ruta privada
+function RootRedirect() {
+  try {
+    const last = sessionStorage.getItem(LAST_PATH_KEY);
+    if (last && last !== '/' && last !== '/login') {
+      return <Navigate to={last} replace />;
+    }
+  } catch (_) { }
+  return <Navigate to="/mails" replace />;
+}
 
 // Evita que /chat/ o /mails/123/ fallen en el catch-all (React Router v6 no matchea /chat con /chat/)
 function NormalizeTrailingSlash({ children }) {
@@ -24,22 +50,25 @@ function NormalizeTrailingSlash({ children }) {
 function App() {
   return (
     <Router>
-      <NormalizeTrailingSlash>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={<Navigate to="/mails" replace />} />
-          <Route element={<PrivateRoute />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/mails" element={<Mails />} />
-            <Route path="/mails/:id" element={<MailThread />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/chat/:id" element={<ChatThread />} />
-            <Route path="/fine-tuning" element={<FineTuning />} />
-            <Route path="/ajustes" element={<Ajustes />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/mails" replace />} />
-        </Routes>
-      </NormalizeTrailingSlash>
+      <>
+        <PersistLastPath />
+        <NormalizeTrailingSlash>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<RootRedirect />} />
+            <Route element={<PrivateRoute />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/mails" element={<Mails />} />
+              <Route path="/mails/:id" element={<MailThread />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/chat/:id" element={<ChatThread />} />
+              <Route path="/fine-tuning" element={<FineTuning />} />
+              <Route path="/ajustes" element={<Ajustes />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/mails" replace />} />
+          </Routes>
+        </NormalizeTrailingSlash>
+      </>
     </Router>
   );
 }
