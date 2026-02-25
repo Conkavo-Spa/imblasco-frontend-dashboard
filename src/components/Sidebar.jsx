@@ -29,7 +29,7 @@ const Sidebar = () => {
         const path = location.pathname || '';
         if (path === '/mails' || path.startsWith('/mails/')) return ['2'];
         if (path === '/chat' || path.startsWith('/chat/')) return ['3'];
-        return ['2'];
+        return ['3'];
     };
 
     // Obtener nombre del usuario del localStorage
@@ -74,8 +74,8 @@ const Sidebar = () => {
                         <Link to="/dashboard">Dashboard</Link>
                     </Menu.Item>
                     */}
-                    <Menu.Item key="2" icon={<MailOutlined />}>
-                        <Link to="/mails">Mails</Link>
+                    <Menu.Item key="2" icon={<MailOutlined />} disabled>
+                        Mails
                     </Menu.Item>
                     <Menu.Item key="3" icon={<MessageOutlined />}>
                         <Link to="/chat">Chat</Link>
@@ -125,8 +125,8 @@ const Sidebar = () => {
                         <Link to="/dashboard">Dashboard</Link>
                     </Menu.Item>
                     */}
-                    <Menu.Item key="2" icon={<MailOutlined />}>
-                        <Link to="/mails">Mails</Link>
+                    <Menu.Item key="2" icon={<MailOutlined />} disabled>
+                        Mails
                     </Menu.Item>
                     <Menu.Item key="3" icon={<MessageOutlined />}>
                         <Link to="/chat">Chat</Link>

@@ -29,7 +29,7 @@ const Login = () => {
             if (values.mail === HARDCODED_USER.email && values.password === HARDCODED_USER.password) {
                 message.success('Inicio de sesión exitoso');
                 localStorage.setItem('user', JSON.stringify(HARDCODED_USER));
-                navigate('/mails');
+                navigate('/chat');
             } else {
                 message.error('Credenciales incorrectas');
             }

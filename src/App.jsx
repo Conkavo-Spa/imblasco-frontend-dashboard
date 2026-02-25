@@ -33,7 +33,7 @@ function RootRedirect() {
       return <Navigate to={last} replace />;
     }
   } catch (_) { }
-  return <Navigate to="/mails" replace />;
+  return <Navigate to="/chat" replace />;
 }
 
 // Evita que /chat/ o /mails/123/ fallen en el catch-all (React Router v6 no matchea /chat con /chat/)
@@ -65,7 +65,7 @@ function App() {
               <Route path="/fine-tuning" element={<FineTuning />} />
               <Route path="/ajustes" element={<Ajustes />} />
             </Route>
-            <Route path="*" element={<Navigate to="/mails" replace />} />
+            <Route path="*" element={<Navigate to="/chat" replace />} />
           </Routes>
         </NormalizeTrailingSlash>
       </>
