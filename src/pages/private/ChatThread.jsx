@@ -19,6 +19,12 @@ const ChatThread = () => {
     const { id } = useParams();
     const location = useLocation();
 
+    const goBack = () => {
+        // Preferimos "volver atrás" en historial; si no hay historial útil, caemos al listado de chats.
+        if (window.history.length > 1) navigate(-1);
+        else navigate('/chat');
+    };
+
     const initialConversation = location.state?.conversation || null;
     const [conversation, setConversation] = useState(initialConversation);
     const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
@@ -37,7 +43,7 @@ const ChatThread = () => {
                 <Sidebar />
                 <div className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto pb-8">
                     <div className="flex flex-col gap-3 mb-6">
-                        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/chat')} className="w-fit">
+                        <Button icon={<ArrowLeftOutlined />} onClick={goBack} className="w-fit">
                             Volver
                         </Button>
                         <h1 className="text-2xl font-extrabold text-[#370776]">
@@ -65,7 +71,7 @@ const ChatThread = () => {
             <div className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto pb-8">
                 <div className="flex flex-col gap-3 mb-6">
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/chat')} className="w-fit">
+                        <Button icon={<ArrowLeftOutlined />} onClick={goBack} className="w-fit">
                             Volver
                         </Button>
                     </div>
