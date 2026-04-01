@@ -81,11 +81,11 @@ const getLastFeedbackText = (record) => {
 
 const hasGoodAnswer = (record) => {
     try {
+        if (record?.isGoodAnswer === true || record?.goodAnswer === true) return true;
+        if (record?.summary?.isGoodAnswer === true || record?.summary?.goodAnswer === true) return true;
         if (record?.summary?.hasGoodAnswer === true) return true;
         if (record?.summary?.hasGoodAnswers === true) return true;
         if (Number(record?.summary?.goodAnswerCount || 0) > 0) return true;
-        const msgs = record?.messages;
-        if (Array.isArray(msgs) && msgs.some((m) => m?.isGoodAnswer === true || m?.goodAnswer === true || m?.good === true)) return true;
     } catch (_) { /* ignore */ }
     return false;
 };

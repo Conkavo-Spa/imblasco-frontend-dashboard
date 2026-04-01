@@ -94,6 +94,14 @@ const ChatThread = () => {
     }
 
     const customer = conversation.participants?.customer;
+    const conversationGood = Boolean(
+        conversation?.isGoodAnswer === true ||
+        conversation?.goodAnswer === true ||
+        conversation?.summary?.isGoodAnswer === true ||
+        conversation?.summary?.goodAnswer === true ||
+        conversation?.summary?.hasGoodAnswer === true ||
+        conversation?.summary?.hasGoodAnswers === true
+    );
 
     return (
         <div className="flex h-screen bg-[#f6f2ff] overflow-hidden">
@@ -131,6 +139,35 @@ const ChatThread = () => {
                         <div className="mt-1 text-gray-600 text-sm">
                             Mensajes: <b>{conversation.summary?.messageCount ?? messagesSorted.length}</b>
                         </div>
+                        <div className="mt-3">
+                            <Checkbox
+                                checked={conversationGood}
+                                disabled={isSavingGoodAnswer}
+                                onChange={async (e) => {
+                                    const next = e.target.checked === true;
+                                    setIsSavingGoodAnswer(true);
+                                    try {
+                                        const resp = await Conversations.setConversationGoodAnswer(conversation._id, next);
+                                        if (resp?.success) {
+                                            message.success(resp.message || 'Actualizado');
+                                            setConversation((prev) => ({
+                                                ...prev,
+                                                summary: { ...(prev?.summary || {}), hasGoodAnswer: next },
+                                                isGoodAnswer: next,
+                                            }));
+                                        } else {
+                                            message.warning(resp?.message || 'No se pudo actualizar');
+                                        }
+                                    } catch (err) {
+                                        message.error(err?.response?.data?.message || err.message || 'No se pudo conectar con el servidor');
+                                    } finally {
+                                        setIsSavingGoodAnswer(false);
+                                    }
+                                }}
+                            >
+                                Bien respondido
+                            </Checkbox>
+                        </div>
                     </Card>
 
                     <Card className="shadow border-[#370776]/10" title="Identificadores">
@@ -153,7 +190,6 @@ const ChatThread = () => {
                             const inbound = m.direction === 'inbound';
                             const from = inbound ? 'Cliente' : 'Imblasco';
                             const hasFeedback = Boolean(String(m.feedback || '').trim());
-                            const isGood = Boolean(m.isGoodAnswer === true || m.goodAnswer === true || m.good === true);
                             return (
                                 <List.Item>
                                     <div className="w-full">
@@ -175,38 +211,6 @@ const ChatThread = () => {
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                {!inbound && (
-                                                    <Checkbox
-                                                        checked={isGood}
-                                                        disabled={isSavingGoodAnswer}
-                                                        onChange={async (e) => {
-                                                            const next = e.target.checked === true;
-                                                            setIsSavingGoodAnswer(true);
-                                                            try {
-                                                                const resp = await Conversations.setMessageGoodAnswer(conversation._id, String(m._id), next);
-                                                                if (resp?.success) {
-                                                                    message.success(resp.message || 'Actualizado');
-                                                                    setConversation((prev) => ({
-                                                                        ...prev,
-                                                                        messages: (prev?.messages || []).map((mm) =>
-                                                                            String(mm._id) === String(m._id)
-                                                                                ? { ...mm, isGoodAnswer: next }
-                                                                                : mm
-                                                                        ),
-                                                                    }));
-                                                                } else {
-                                                                    message.warning(resp?.message || 'No se pudo actualizar');
-                                                                }
-                                                            } catch (err) {
-                                                                message.error(err?.response?.data?.message || err.message || 'No se pudo conectar con el servidor');
-                                                            } finally {
-                                                                setIsSavingGoodAnswer(false);
-                                                            }
-                                                        }}
-                                                    >
-                                                        Bien respondido
-                                                    </Checkbox>
-                                                )}
                                                 {!inbound && (
                                                     <Button
                                                         size="small"
