@@ -67,6 +67,27 @@ const hasPruebaMessage = (record) => {
     return false;
 };
 
+const FeedbackDots = ({ record }) => {
+    const hasFeedback = hasConversationFeedback(record);
+    const hasPrueba = hasPruebaMessage(record);
+    if (!hasFeedback && !hasPrueba) return null;
+
+    return (
+        <span className="inline-flex items-center gap-1">
+            {hasFeedback ? (
+                <Tooltip title="Este chat tiene feedback">
+                    <Badge className="im-feedback-dot" dot color="#faad14" />
+                </Tooltip>
+            ) : null}
+            {hasPrueba ? (
+                <Tooltip title="Chat de prueba">
+                    <Badge className="im-feedback-dot" dot color="#1677ff" />
+                </Tooltip>
+            ) : null}
+        </span>
+    );
+};
+
 const Chat = () => {
     const loadInitialState = () => {
         try {
@@ -208,12 +229,7 @@ const Chat = () => {
             render: (_, record) => {
                 const preview = record.summary?.lastMessagePreview;
                 const txt = preview ? `${preview.slice(0, 80)}${preview.length > 80 ? '…' : ''}` : '—';
-                const isPrueba = hasPruebaMessage(record);
-                return (
-                    <span className={isPrueba ? 'text-blue-600 font-semibold' : undefined}>
-                        {txt}
-                    </span>
-                );
+                return <span>{txt}</span>;
             },
         },
         {
@@ -235,30 +251,29 @@ const Chat = () => {
             width: 110,
             align: 'center',
             render: (_, record) => (
-                <Tooltip title={hasConversationFeedback(record) ? 'Este chat tiene feedback' : ''}>
-                    <Badge className="im-feedback-dot" dot={hasConversationFeedback(record)} color="#faad14" offset={[2, 0]}>
-                        <Button
-                            type="primary"
-                            size="small"
-                            style={{ maxWidth: '100%' }}
-                            onClick={() => {
-                                try { sessionStorage.setItem(CHAT_LAST_PAGE, String(currentPage)); } catch (_) {}
-                                const nextState = {
-                                    state: {
-                                        conversation: record,
-                                        from: {
-                                            pathname: location.pathname,
-                                            page: currentPage,
-                                        },
+                <span className="inline-flex items-center gap-2">
+                    <FeedbackDots record={record} />
+                    <Button
+                        type="primary"
+                        size="small"
+                        style={{ maxWidth: '100%' }}
+                        onClick={() => {
+                            try { sessionStorage.setItem(CHAT_LAST_PAGE, String(currentPage)); } catch (_) {}
+                            const nextState = {
+                                state: {
+                                    conversation: record,
+                                    from: {
+                                        pathname: location.pathname,
+                                        page: currentPage,
                                     },
-                                };
-                                navigate(`/chat/${String(record._id)}?fromPage=${currentPage}`, nextState);
-                            }}
-                        >
-                            Detalle
-                        </Button>
-                    </Badge>
-                </Tooltip>
+                                },
+                            };
+                            navigate(`/chat/${String(record._id)}?fromPage=${currentPage}`, nextState);
+                        }}
+                    >
+                        Detalle
+                    </Button>
+                </span>
             ),
         },
     ];
@@ -318,11 +333,7 @@ const Chat = () => {
                                                 key={conv._id}
                                                 title={
                                                     <span className="flex items-center gap-2">
-                                                        {hasConversationFeedback(conv) ? (
-                                                            <Tooltip title="Este chat tiene feedback">
-                                                                <Badge className="im-feedback-dot" dot color="#faad14" />
-                                                            </Tooltip>
-                                                        ) : null}
+                                                        <FeedbackDots record={conv} />
                                                         <span>No identificado</span>
                                                     </span>
                                                 }
@@ -331,7 +342,7 @@ const Chat = () => {
                                             >
                                                 <p>
                                                     <b>Último mensaje:</b>{' '}
-                                                    <span className={hasPruebaMessage(conv) ? 'text-blue-600 font-semibold' : undefined}>
+                                                    <span>
                                                         {(conv.summary?.lastMessagePreview || '—').slice(0, 120)}
                                                         {(conv.summary?.lastMessagePreview?.length || 0) > 120 ? '…' : ''}
                                                     </span>
