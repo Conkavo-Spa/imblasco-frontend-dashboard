@@ -34,8 +34,13 @@ const Sidebar = () => {
 
     // Obtener nombre del usuario del localStorage
     const getUserName = () => {
-        // Para este dashboard el usuario visible es fijo
-        return 'Diego';
+        try {
+            const raw = localStorage.getItem('user');
+            const u = raw ? JSON.parse(raw) : null;
+            return u?.name || 'Diego';
+        } catch (_) {
+            return 'Diego';
+        }
     };
 
     return (

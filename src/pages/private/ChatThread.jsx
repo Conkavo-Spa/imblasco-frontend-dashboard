@@ -5,6 +5,9 @@ import { ArrowLeftOutlined, EditOutlined, MessageOutlined } from '@ant-design/ic
 import Sidebar from '../../components/Sidebar';
 import Conversations from '../../services/Conversations';
 
+// Asegurar limpieza de máscaras de modales al desmontar
+import { useEffect } from 'react';
+
 const formatDate = (date) => {
     if (!date) return '—';
     const d = new Date(date);
@@ -31,6 +34,15 @@ const ChatThread = () => {
     const [feedbackText, setFeedbackText] = useState('');
     const [selectedMessageId, setSelectedMessageId] = useState(null);
     const [isSavingFeedback, setIsSavingFeedback] = useState(false);
+
+    // Si salimos de esta vista con un modal abierto, destruirlo para que no quede la máscara
+    useEffect(() => {
+        return () => {
+            try {
+                Modal.destroyAll();
+            } catch (_) {}
+        };
+    }, []);
 
     const messagesSorted = useMemo(() => {
         const msgs = conversation?.messages || [];
