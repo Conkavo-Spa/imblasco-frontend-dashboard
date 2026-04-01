@@ -68,6 +68,11 @@ const Chat = () => {
 
     // Restaurar scroll tras montar
     useEffect(() => {
+        try {
+            // Log inicial del estado restaurado
+            // eslint-disable-next-line no-console
+            console.log('[chat][mount] initial state', initial);
+        } catch (_) {}
         if (initial.scrollY && typeof window !== 'undefined') {
             setTimeout(() => window.scrollTo(0, initial.scrollY), 0);
         }
@@ -159,13 +164,17 @@ const Chat = () => {
                     style={{ maxWidth: '100%' }}
                     onClick={() => {
                         try {
+                            // eslint-disable-next-line no-console
+                            console.log('[chat][open-detail] store state', {
+                                page: currentPage, date: dateFilter, scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                            });
                             sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                 page: currentPage,
                                 date: dateFilter,
                                 scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
                             }));
                         } catch (_) {}
-                        navigate(`/chat/${String(record._id)}`, {
+                        const nextState = {
                             state: {
                                 conversation: record,
                                 from: {
@@ -175,7 +184,12 @@ const Chat = () => {
                                     scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
                                 },
                             },
-                        });
+                        };
+                        try {
+                            // eslint-disable-next-line no-console
+                            console.log('[chat][open-detail] navigate with', nextState.state.from);
+                        } catch (_) {}
+                        navigate(`/chat/${String(record._id)}`, nextState);
                     }}
                 >
                     Detalle
@@ -248,13 +262,17 @@ const Chat = () => {
                                                         style={{ maxWidth: '100%' }}
                                                         onClick={() => {
                                                             try {
+                                                                // eslint-disable-next-line no-console
+                                                                console.log('[chat][open-detail-mobile] store state', {
+                                                                    page: currentPage, date: dateFilter, scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                                                });
                                                                 sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                                                     page: currentPage,
                                                                     date: dateFilter,
                                                                     scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
                                                                 }));
                                                             } catch (_) {}
-                                                            navigate(`/chat/${String(conv._id)}`, {
+                                                            const nextState = {
                                                                 state: {
                                                                     conversation: conv,
                                                                     from: {
@@ -264,7 +282,12 @@ const Chat = () => {
                                                                         scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
                                                                     },
                                                                 },
-                                                            });
+                                                            };
+                                                            try {
+                                                                // eslint-disable-next-line no-console
+                                                                console.log('[chat][open-detail-mobile] navigate with', nextState.state.from);
+                                                            } catch (_) {}
+                                                            navigate(`/chat/${String(conv._id)}`, nextState);
                                                         }}
                                                     >
                                                         Detalle
