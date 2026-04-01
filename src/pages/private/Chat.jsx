@@ -91,7 +91,7 @@ const Chat = () => {
         return initial.page || 1;
     };
 
-    const [currentPage, setCurrentPage] = useState(getInitialPageFromQuery());
+    const [currentPage, setCurrentPage] = useState(1);
     const [dateFilter, setDateFilter] = useState(initial.date);
 
     const isMobile = useMediaQuery({ maxWidth: 768 });
@@ -99,6 +99,18 @@ const Chat = () => {
     const location = useLocation();
 
     const { data, isLoading } = useConversations({ channel: 'chat', page: 1, limit: 100 });
+
+    // Sincronizar currentPage con la query cada vez que cambie la URL
+    useEffect(() => {
+        try {
+            const q = new URLSearchParams(location.search || '');
+            const p = Number(q.get('page') || '1');
+            setCurrentPage(Number.isFinite(p) && p > 0 ? p : 1);
+        } catch (_) {
+            setCurrentPage(1);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [location.search]);
 
     // Restaurar scroll del contenedor tras montar
     useEffect(() => {
@@ -245,7 +257,14 @@ const Chat = () => {
                             pagination={{
                                 pageSize: itemsPerPage,
                                 current: currentPage,
-                                onChange: (page) => setCurrentPage(page),
+                                onChange: (page) => {
+                                    setCurrentPage(page);
+                                    try {
+                                        const q = new URLSearchParams(location.search || '');
+                                        q.set('page', String(page));
+                                        navigate(`/chat?${q.toString()}`, { replace: true });
+                                    } catch (_) {}
+                                },
                             }}
                             bordered
                             tableLayout="fixed"
