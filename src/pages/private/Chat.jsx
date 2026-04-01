@@ -14,6 +14,7 @@ import {
 } from 'antd';
 // icon removed to fit column width
 import useConversations from '../../hooks/useConversations';
+import Conversations from '../../services/Conversations';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMediaQuery } from 'react-responsive';
 import { useLocation, useNavigate } from 'react-router-dom';
