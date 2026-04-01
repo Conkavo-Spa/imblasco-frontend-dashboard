@@ -8,6 +8,7 @@ import {
     Button,
     DatePicker,
     Badge,
+    Tooltip,
 } from 'antd';
 // icon removed to fit column width
 import useConversations from '../../hooks/useConversations';
@@ -50,6 +51,18 @@ const hasConversationFeedback = (record) => {
         if (record?.hasFeedback === true) return true;
         const msgs = record?.messages;
         if (Array.isArray(msgs) && msgs.some((m) => String(m?.feedback || '').trim())) return true;
+    } catch (_) { /* ignore */ }
+    return false;
+};
+
+const hasPruebaMessage = (record) => {
+    try {
+        const preview = String(record?.summary?.lastMessagePreview || '');
+        if (/^\s*prueba\b/i.test(preview)) return true;
+        const msgs = record?.messages;
+        if (Array.isArray(msgs)) {
+            return msgs.some((m) => /^\s*prueba\b/i.test(String(m?.content?.text || m?.content || '')));
+        }
     } catch (_) { /* ignore */ }
     return false;
 };
@@ -194,7 +207,13 @@ const Chat = () => {
             ellipsis: true,
             render: (_, record) => {
                 const preview = record.summary?.lastMessagePreview;
-                return preview ? `${preview.slice(0, 80)}${preview.length > 80 ? '…' : ''}` : '—';
+                const txt = preview ? `${preview.slice(0, 80)}${preview.length > 80 ? '…' : ''}` : '—';
+                const isPrueba = hasPruebaMessage(record);
+                return (
+                    <span className={isPrueba ? 'text-blue-600 font-semibold' : undefined}>
+                        {txt}
+                    </span>
+                );
             },
         },
         {
@@ -216,28 +235,30 @@ const Chat = () => {
             width: 110,
             align: 'center',
             render: (_, record) => (
-                <Badge dot={hasConversationFeedback(record)} color="#faad14" offset={[2, 0]}>
-                    <Button
-                        type="primary"
-                        size="small"
-                        style={{ maxWidth: '100%' }}
-                        onClick={() => {
-                            try { sessionStorage.setItem(CHAT_LAST_PAGE, String(currentPage)); } catch (_) {}
-                            const nextState = {
-                                state: {
-                                    conversation: record,
-                                    from: {
-                                        pathname: location.pathname,
-                                        page: currentPage,
+                <Tooltip title={hasConversationFeedback(record) ? 'Este chat tiene feedback' : ''}>
+                    <Badge className="im-feedback-dot" dot={hasConversationFeedback(record)} color="#faad14" offset={[2, 0]}>
+                        <Button
+                            type="primary"
+                            size="small"
+                            style={{ maxWidth: '100%' }}
+                            onClick={() => {
+                                try { sessionStorage.setItem(CHAT_LAST_PAGE, String(currentPage)); } catch (_) {}
+                                const nextState = {
+                                    state: {
+                                        conversation: record,
+                                        from: {
+                                            pathname: location.pathname,
+                                            page: currentPage,
+                                        },
                                     },
-                                },
-                            };
-                            navigate(`/chat/${String(record._id)}?fromPage=${currentPage}`, nextState);
-                        }}
-                    >
-                        Detalle
-                    </Button>
-                </Badge>
+                                };
+                                navigate(`/chat/${String(record._id)}?fromPage=${currentPage}`, nextState);
+                            }}
+                        >
+                            Detalle
+                        </Button>
+                    </Badge>
+                </Tooltip>
             ),
         },
     ];
@@ -297,7 +318,11 @@ const Chat = () => {
                                                 key={conv._id}
                                                 title={
                                                     <span className="flex items-center gap-2">
-                                                        {hasConversationFeedback(conv) ? <Badge dot color="#faad14" /> : null}
+                                                        {hasConversationFeedback(conv) ? (
+                                                            <Tooltip title="Este chat tiene feedback">
+                                                                <Badge className="im-feedback-dot" dot color="#faad14" />
+                                                            </Tooltip>
+                                                        ) : null}
                                                         <span>No identificado</span>
                                                     </span>
                                                 }
@@ -306,8 +331,10 @@ const Chat = () => {
                                             >
                                                 <p>
                                                     <b>Último mensaje:</b>{' '}
-                                                    {(conv.summary?.lastMessagePreview || '—').slice(0, 120)}
-                                                    {(conv.summary?.lastMessagePreview?.length || 0) > 120 ? '…' : ''}
+                                                    <span className={hasPruebaMessage(conv) ? 'text-blue-600 font-semibold' : undefined}>
+                                                        {(conv.summary?.lastMessagePreview || '—').slice(0, 120)}
+                                                        {(conv.summary?.lastMessagePreview?.length || 0) > 120 ? '…' : ''}
+                                                    </span>
                                                 </p>
                                                 <p>
                                                     <b>Fecha:</b> {formatDate(conv.summary?.lastMessageAt)}

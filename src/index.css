@@ -75,3 +75,9 @@ body {
 .ant-menu.ant-menu-dark .ant-menu-item:hover {
     background: rgba(255, 255, 255, 0.08) !important;
 }
+
+/* Badge dot (feedback) a bit bigger */
+.im-feedback-dot .ant-badge-dot {
+    width: 10px !important;
+    height: 10px !important;
+}
