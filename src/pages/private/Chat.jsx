@@ -199,6 +199,16 @@ const Chat = () => {
     const location = useLocation();
     const queryClient = useQueryClient();
 
+    const canDelete = (() => {
+        try {
+            const raw = localStorage.getItem('user');
+            const u = raw ? JSON.parse(raw) : null;
+            return u?.email === 'cesar.barahona@conkavo.cl';
+        } catch (_) {
+            return false;
+        }
+    })();
+
     const { data, isLoading } = useConversations({ channel: 'chat', page: 1, limit: 100 });
 
     // Sincronizar currentPage con la query cada vez que cambie la URL
@@ -327,26 +337,28 @@ const Chat = () => {
                     >
                         Detalle
                     </Button>
-                    <Popconfirm
-                        title="Eliminar hilo"
-                        description="¿Seguro que quieres eliminar esta conversación?"
-                        okText="Eliminar"
-                        cancelText="Cancelar"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={async () => {
-                            try {
-                                await Conversations.deleteConversation(String(record._id));
-                                message.success('Hilo eliminado');
-                                queryClient.invalidateQueries({ queryKey: ['conversations'] });
-                            } catch (err) {
-                                message.error(err?.response?.data?.message || err.message || 'No se pudo eliminar');
-                            }
-                        }}
-                    >
-                        <Button danger size="small">
-                            Eliminar
-                        </Button>
-                    </Popconfirm>
+                    {canDelete ? (
+                        <Popconfirm
+                            title="Eliminar hilo"
+                            description="¿Seguro que quieres eliminar esta conversación?"
+                            okText="Eliminar"
+                            cancelText="Cancelar"
+                            okButtonProps={{ danger: true }}
+                            onConfirm={async () => {
+                                try {
+                                    await Conversations.deleteConversation(String(record._id));
+                                    message.success('Hilo eliminado');
+                                    queryClient.invalidateQueries({ queryKey: ['conversations'] });
+                                } catch (err) {
+                                    message.error(err?.response?.data?.message || err.message || 'No se pudo eliminar');
+                                }
+                            }}
+                        >
+                            <Button danger size="small">
+                                Eliminar
+                            </Button>
+                        </Popconfirm>
+                    ) : null}
                 </div>
             ),
         },
