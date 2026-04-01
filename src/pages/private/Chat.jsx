@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Sidebar from '../../components/Sidebar';
 import {
     Table,
@@ -38,14 +38,40 @@ const formatDate = (date) => {
     });
 };
 
+const CHAT_LIST_STATE = 'chat_list_state';
+
 const Chat = () => {
-    const [currentPage, setCurrentPage] = useState(1);
-    const [dateFilter, setDateFilter] = useState(null);
+    const loadInitialState = () => {
+        try {
+            const raw = sessionStorage.getItem(CHAT_LIST_STATE);
+            if (!raw) return { page: 1, date: null, scrollY: 0 };
+            const obj = JSON.parse(raw);
+            return {
+                page: Number(obj.page) > 0 ? Number(obj.page) : 1,
+                date: obj.date || null,
+                scrollY: Number.isFinite(obj.scrollY) ? Number(obj.scrollY) : 0,
+            };
+        } catch (_) {
+            return { page: 1, date: null, scrollY: 0 };
+        }
+    };
+
+    const initial = loadInitialState();
+    const [currentPage, setCurrentPage] = useState(initial.page);
+    const [dateFilter, setDateFilter] = useState(initial.date);
 
     const isMobile = useMediaQuery({ maxWidth: 768 });
     const navigate = useNavigate();
 
     const { data, isLoading } = useConversations({ channel: 'chat', page: 1, limit: 100 });
+
+    // Restaurar scroll tras montar
+    useEffect(() => {
+        if (initial.scrollY && typeof window !== 'undefined') {
+            setTimeout(() => window.scrollTo(0, initial.scrollY), 0);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const conversations = data?.data?.docs ?? [];
     const dataToRender = useMemo(() => {
@@ -130,7 +156,16 @@ const Chat = () => {
                     type="primary"
                     size="small"
                     style={{ maxWidth: '100%' }}
-                    onClick={() => navigate(`/chat/${String(record._id)}`, { state: { conversation: record } })}
+                    onClick={() => {
+                        try {
+                            sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
+                                page: currentPage,
+                                date: dateFilter,
+                                scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                            }));
+                        } catch (_) {}
+                        navigate(`/chat/${String(record._id)}`, { state: { conversation: record } });
+                    }}
                 >
                     Detalle
                 </Button>
@@ -200,7 +235,16 @@ const Chat = () => {
                                                         type="primary"
                                                         size="small"
                                                         style={{ maxWidth: '100%' }}
-                                                        onClick={() => navigate(`/chat/${String(conv._id)}`, { state: { conversation: conv } })}
+                                                        onClick={() => {
+                                                            try {
+                                                                sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
+                                                                    page: currentPage,
+                                                                    date: dateFilter,
+                                                                    scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                                                }));
+                                                            } catch (_) {}
+                                                            navigate(`/chat/${String(conv._id)}`, { state: { conversation: conv } });
+                                                        }}
                                                     >
                                                         Detalle
                                                     </Button>
