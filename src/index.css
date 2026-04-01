@@ -76,8 +76,8 @@ body {
     background: rgba(255, 255, 255, 0.08) !important;
 }
 
-/* Badge dot (feedback) a bit bigger */
+/* Badge dot (feedback/prueba/bien respondido) */
 .im-feedback-dot .ant-badge-dot {
-    width: 10px !important;
-    height: 10px !important;
+    width: 12px !important;
+    height: 12px !important;
 }

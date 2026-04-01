@@ -123,7 +123,7 @@ const FeedbackDots = ({ record }) => {
             {good ? (
                 <Tooltip title="Bien respondido">
                     <span className="inline-flex leading-none">
-                        <Badge className="im-feedback-dot" dot color="#2f54eb" />
+                        <Badge className="im-feedback-dot" dot color="#52c41a" />
                     </span>
                 </Tooltip>
             ) : null}
