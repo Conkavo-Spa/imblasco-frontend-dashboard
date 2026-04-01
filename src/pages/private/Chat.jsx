@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Sidebar from '../../components/Sidebar';
 import {
     Table,
@@ -57,6 +57,7 @@ const Chat = () => {
     };
 
     const initial = loadInitialState();
+    const scrollRef = useRef(null);
     const [currentPage, setCurrentPage] = useState(initial.page);
     const [dateFilter, setDateFilter] = useState(initial.date);
 
@@ -66,15 +67,20 @@ const Chat = () => {
 
     const { data, isLoading } = useConversations({ channel: 'chat', page: 1, limit: 100 });
 
-    // Restaurar scroll tras montar
+    // Restaurar scroll del contenedor tras montar
     useEffect(() => {
         try {
             // Log inicial del estado restaurado
             // eslint-disable-next-line no-console
             console.log('[chat][mount] initial state', initial);
         } catch (_) {}
-        if (initial.scrollY && typeof window !== 'undefined') {
-            setTimeout(() => window.scrollTo(0, initial.scrollY), 0);
+        const y = Number(initial.scrollY) || 0;
+        if (y && scrollRef.current) {
+            setTimeout(() => {
+                if (scrollRef.current) {
+                    scrollRef.current.scrollTop = y;
+                }
+            }, 0);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -166,12 +172,12 @@ const Chat = () => {
                         try {
                             // eslint-disable-next-line no-console
                             console.log('[chat][open-detail] store state', {
-                                page: currentPage, date: dateFilter, scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                page: currentPage, date: dateFilter, scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
                             });
                             sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                 page: currentPage,
                                 date: dateFilter,
-                                scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
                             }));
                         } catch (_) {}
                         const nextState = {
@@ -181,7 +187,7 @@ const Chat = () => {
                                     pathname: location.pathname,
                                     page: currentPage,
                                     date: dateFilter,
-                                    scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                    scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
                                 },
                             },
                         };
@@ -201,7 +207,7 @@ const Chat = () => {
     return (
         <div className="flex h-screen bg-[#f6f2ff] overflow-hidden">
             <Sidebar />
-            <div className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto overflow-x-auto pb-8">
+            <div ref={scrollRef} className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto overflow-x-auto pb-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-extrabold text-[#370776]">Chats</h1>
                 </div>
@@ -264,12 +270,12 @@ const Chat = () => {
                                                             try {
                                                                 // eslint-disable-next-line no-console
                                                                 console.log('[chat][open-detail-mobile] store state', {
-                                                                    page: currentPage, date: dateFilter, scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                                                    page: currentPage, date: dateFilter, scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
                                                                 });
                                                                 sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                                                     page: currentPage,
                                                                     date: dateFilter,
-                                                                    scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                                                    scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
                                                                 }));
                                                             } catch (_) {}
                                                             const nextState = {
@@ -279,7 +285,7 @@ const Chat = () => {
                                                                         pathname: location.pathname,
                                                                         page: currentPage,
                                                                         date: dateFilter,
-                                                                        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                                                        scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
                                                                     },
                                                                 },
                                                             };
