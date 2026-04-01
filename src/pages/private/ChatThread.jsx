@@ -52,6 +52,7 @@ const ChatThread = () => {
     const [selectedMessageId, setSelectedMessageId] = useState(null);
     const [isSavingFeedback, setIsSavingFeedback] = useState(false);
     const [isSavingGoodAnswer, setIsSavingGoodAnswer] = useState(false);
+    const [isGoodAnswerSupported, setIsGoodAnswerSupported] = useState(true);
 
     // Si salimos de esta vista con un modal abierto, destruirlo para que no quede la máscara
     useEffect(() => {
@@ -142,7 +143,7 @@ const ChatThread = () => {
                         <div className="mt-3">
                             <Checkbox
                                 checked={conversationGood}
-                                disabled={isSavingGoodAnswer}
+                                disabled={isSavingGoodAnswer || !isGoodAnswerSupported}
                                 onChange={async (e) => {
                                     const next = e.target.checked === true;
                                     setIsSavingGoodAnswer(true);
@@ -159,7 +160,13 @@ const ChatThread = () => {
                                             message.warning(resp?.message || 'No se pudo actualizar');
                                         }
                                     } catch (err) {
-                                        message.error(err?.response?.data?.message || err.message || 'No se pudo conectar con el servidor');
+                                        const status = err?.response?.status;
+                                        if (status === 404) {
+                                            setIsGoodAnswerSupported(false);
+                                            message.warning('Tu backend aún no soporta "Bien respondido" (endpoint no encontrado).');
+                                        } else {
+                                            message.error(err?.response?.data?.message || err.message || 'No se pudo conectar con el servidor');
+                                        }
                                     } finally {
                                         setIsSavingGoodAnswer(false);
                                     }
