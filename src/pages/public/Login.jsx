@@ -14,6 +14,15 @@ const HARDCODED_USER = {
     active: true
 };
 
+// Usuario adicional solicitado (hardcodeado)
+const HARDCODED_USER_2 = {
+    email: 'cesar.barahona@conkavo.cl',
+    password: 'cesar',
+    _id: 'hardcoded-user-cesar',
+    name: 'cesar',
+    active: true
+};
+
 const Login = () => {
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -29,6 +38,10 @@ const Login = () => {
             if (values.mail === HARDCODED_USER.email && values.password === HARDCODED_USER.password) {
                 message.success('Inicio de sesión exitoso');
                 localStorage.setItem('user', JSON.stringify(HARDCODED_USER));
+                navigate('/chat');
+            } else if (values.mail === HARDCODED_USER_2.email && values.password === HARDCODED_USER_2.password) {
+                message.success('Inicio de sesión exitoso');
+                localStorage.setItem('user', JSON.stringify(HARDCODED_USER_2));
                 navigate('/chat');
             } else {
                 message.error('Credenciales incorrectas');
