@@ -43,6 +43,17 @@ const Sidebar = () => {
         }
     };
 
+    // Solo cesar.barahona@conkavo.cl puede ver Mails habilitado
+    const isCesar = (() => {
+        try {
+            const raw = localStorage.getItem('user');
+            const u = raw ? JSON.parse(raw) : null;
+            return u?.email === 'cesar.barahona@conkavo.cl';
+        } catch (_) {
+            return false;
+        }
+    })();
+
     return (
         <>
             {/* Botón hamburguesa solo visible en mobile */}
@@ -79,9 +90,15 @@ const Sidebar = () => {
                         <Link to="/dashboard">Dashboard</Link>
                     </Menu.Item>
                     */}
-                    <Menu.Item key="2" icon={<MailOutlined />} disabled>
-                        Mails
-                    </Menu.Item>
+                    {isCesar ? (
+                        <Menu.Item key="2" icon={<MailOutlined />}>
+                            <Link to="/mails">Mails</Link>
+                        </Menu.Item>
+                    ) : (
+                        <Menu.Item key="2" icon={<MailOutlined />} disabled>
+                            Mails
+                        </Menu.Item>
+                    )}
                     <Menu.Item key="3" icon={<MessageOutlined />}>
                         <Link to="/chat">Chat</Link>
                     </Menu.Item>
@@ -130,9 +147,15 @@ const Sidebar = () => {
                         <Link to="/dashboard">Dashboard</Link>
                     </Menu.Item>
                     */}
-                    <Menu.Item key="2" icon={<MailOutlined />} disabled>
-                        Mails
-                    </Menu.Item>
+                    {isCesar ? (
+                        <Menu.Item key="2" icon={<MailOutlined />}>
+                            <Link to="/mails">Mails</Link>
+                        </Menu.Item>
+                    ) : (
+                        <Menu.Item key="2" icon={<MailOutlined />} disabled>
+                            Mails
+                        </Menu.Item>
+                    )}
                     <Menu.Item key="3" icon={<MessageOutlined />}>
                         <Link to="/chat">Chat</Link>
                     </Menu.Item>
