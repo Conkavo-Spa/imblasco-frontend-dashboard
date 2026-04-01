@@ -25,44 +25,22 @@ const ChatThread = () => {
     const goBack = () => {
         // Si el listado nos pasó un "from", úsalo para restaurar exactamente su estado.
         const from = location.state?.from;
-        try {
-            // eslint-disable-next-line no-console
-            console.log('[thread][goBack] from state', from, 'historyLen', window.history.length);
-        } catch (_) {}
         if (from) {
             try {
-                // eslint-disable-next-line no-console
-                console.log('[thread][goBack] restore list state', {
-                    page: Number(from.page) > 0 ? Number(from.page) : 1,
-                    date: from.date || null,
-                    scrollY: Number.isFinite(from.scrollY) ? Number(from.scrollY) : 0,
-                });
                 sessionStorage.setItem('chat_list_state', JSON.stringify({
                     page: Number(from.page) > 0 ? Number(from.page) : 1,
                     date: from.date || null,
                     scrollY: Number.isFinite(from.scrollY) ? Number(from.scrollY) : 0,
                 }));
             } catch (_) {}
-            try {
-                // eslint-disable-next-line no-console
-                console.log('[thread][goBack] navigate to /chat');
-            } catch (_) {}
             navigate('/chat', { replace: true });
             return;
         }
         // Si no tenemos "from", intentar historial y luego caer al listado.
         if (window.history.length > 1) {
-            try {
-                // eslint-disable-next-line no-console
-                console.log('[thread][goBack] using history.back()');
-            } catch (_) {}
             navigate(-1);
             return;
         }
-        try {
-            // eslint-disable-next-line no-console
-            console.log('[thread][goBack] fallback to /chat');
-        } catch (_) {}
         navigate('/chat', { replace: true });
     };
 

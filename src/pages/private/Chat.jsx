@@ -91,11 +91,6 @@ const Chat = () => {
 
     // Restaurar scroll del contenedor tras montar
     useEffect(() => {
-        try {
-            // Log inicial del estado restaurado
-            // eslint-disable-next-line no-console
-            console.log('[chat][mount] initial state', initial);
-        } catch (_) {}
         const y = Number(initial.scrollY) || 0;
         if (y) {
             setTimeout(() => {
@@ -193,7 +188,6 @@ const Chat = () => {
                         try {
                             // eslint-disable-next-line no-console
                             const y = getBestScrollTop();
-                            console.log('[chat][open-detail] store state', { page: currentPage, date: dateFilter, scrollY: y });
                             sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                 page: currentPage,
                                 date: dateFilter,
@@ -211,10 +205,6 @@ const Chat = () => {
                                 },
                             },
                         };
-                        try {
-                            // eslint-disable-next-line no-console
-                            console.log('[chat][open-detail] navigate with', nextState.state.from);
-                        } catch (_) {}
                         navigate(`/chat/${String(record._id)}`, nextState);
                     }}
                 >
@@ -290,7 +280,6 @@ const Chat = () => {
                                                             try {
                                                                 // eslint-disable-next-line no-console
                                                                 const y = getBestScrollTop();
-                                                                console.log('[chat][open-detail-mobile] store state', { page: currentPage, date: dateFilter, scrollY: y });
                                                                 sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                                                     page: currentPage,
                                                                     date: dateFilter,
@@ -308,10 +297,6 @@ const Chat = () => {
                                                                     },
                                                                 },
                                                             };
-                                                            try {
-                                                                // eslint-disable-next-line no-console
-                                                                console.log('[chat][open-detail-mobile] navigate with', nextState.state.from);
-                                                            } catch (_) {}
                                                             navigate(`/chat/${String(conv._id)}`, nextState);
                                                         }}
                                                     >
