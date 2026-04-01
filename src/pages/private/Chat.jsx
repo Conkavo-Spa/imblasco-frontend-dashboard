@@ -91,7 +91,7 @@ const Chat = () => {
                     const raw = localStorage.getItem('user');
                     const user = raw ? JSON.parse(raw) : null;
                     if (user?.email === 'cesar.barahona@conkavo.cl') {
-                        return record?.summary?.lastSeenIp || 'No identificado';
+                        return record?.summary?.lastSeenIp || String(record?._id || 'No identificado');
                     }
                 } catch (_) { /* ignore */ }
 
