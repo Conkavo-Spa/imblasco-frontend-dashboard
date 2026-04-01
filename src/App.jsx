@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Modal } from 'antd';
 import Login from './pages/public/Login';
 import Dashboard from './pages/private/Dashboard';
 import Mails from './pages/private/Mails';
@@ -21,6 +22,11 @@ function PersistLastPath() {
         sessionStorage.setItem(LAST_PATH_KEY, pathname);
       } catch (_) { }
     }
+    // Limpia cualquier modal/máscara residual al cambiar de ruta
+    try {
+      Modal.destroyAll();
+      document.body.classList.remove('ant-modal-open');
+    } catch (_) {}
   }, [pathname]);
   return null;
 }
