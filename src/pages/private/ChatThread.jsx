@@ -23,13 +23,22 @@ const ChatThread = () => {
     const location = useLocation();
 
     const goBack = () => {
-        // Preferir la página que trajo el listado en state.from
+        // 1) Priorizar query param ?fromPage=...
+        try {
+            const q = new URLSearchParams(location.search || '');
+            const qp = Number(q.get('fromPage') || '0');
+            if (Number.isFinite(qp) && qp > 0) {
+                navigate(`/chat?page=${qp}`, { replace: true });
+                return;
+            }
+        } catch (_) {}
+        // 2) Luego, usar state.from.page si existe
         const fromPage = Number(location.state?.from?.page || '0');
         if (Number.isFinite(fromPage) && fromPage > 0) {
             navigate(`/chat?page=${fromPage}`, { replace: true });
             return;
         }
-        // Fallback: página guardada en sesión
+        // 3) Fallback: página guardada en sesión
         const raw = sessionStorage.getItem('chat_last_page');
         const p = Number(raw || '1');
         const page = Number.isFinite(p) && p > 0 ? p : 1;

@@ -206,7 +206,7 @@ const Chat = () => {
                                 },
                             },
                         };
-                        navigate(`/chat/${String(record._id)}`, nextState);
+                        navigate(`/chat/${String(record._id)}?fromPage=${currentPage}`, nextState);
                     }}
                 >
                     Detalle
@@ -292,7 +292,7 @@ const Chat = () => {
                                                                     },
                                                                 },
                                                             };
-                                                            navigate(`/chat/${String(conv._id)}`, nextState);
+                                                            navigate(`/chat/${String(conv._id)}?fromPage=${currentPage}`, nextState);
                                                         }}
                                                     >
                                                         Detalle
