@@ -23,7 +23,13 @@ const ChatThread = () => {
     const location = useLocation();
 
     const goBack = () => {
-        // Volver a la página guardada de listado (simple y predecible)
+        // Preferir la página que trajo el listado en state.from
+        const fromPage = Number(location.state?.from?.page || '0');
+        if (Number.isFinite(fromPage) && fromPage > 0) {
+            navigate(`/chat?page=${fromPage}`, { replace: true });
+            return;
+        }
+        // Fallback: página guardada en sesión
         const raw = sessionStorage.getItem('chat_last_page');
         const p = Number(raw || '1');
         const page = Number.isFinite(p) && p > 0 ? p : 1;
