@@ -242,7 +242,11 @@ const Chat = () => {
                             dataSource={dataToRender}
                             columns={columns}
                             loading={isLoading}
-                            pagination={{ pageSize: itemsPerPage }}
+                            pagination={{
+                                pageSize: itemsPerPage,
+                                current: currentPage,
+                                onChange: (page) => setCurrentPage(page),
+                            }}
                             bordered
                             tableLayout="fixed"
                             size="small"
