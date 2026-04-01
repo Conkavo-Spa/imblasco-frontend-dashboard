@@ -15,6 +15,9 @@ class ConversationsService {
 
     setMessageFeedback = (conversationId, messageId, feedback) =>
         instance.put(`/conversations/${conversationId}/messages/${messageId}/feedback`, { feedback });
+
+    setMessageGoodAnswer = (conversationId, messageId, isGood) =>
+        instance.put(`/conversations/${conversationId}/messages/${messageId}/good-answer`, { isGood: isGood === true });
 }
 
 const Conversations = new ConversationsService();

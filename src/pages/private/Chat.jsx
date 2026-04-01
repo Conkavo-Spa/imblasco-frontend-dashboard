@@ -55,6 +55,41 @@ const hasConversationFeedback = (record) => {
     return false;
 };
 
+const getLastFeedbackText = (record) => {
+    try {
+        const summary = record?.summary || {};
+        const direct =
+            summary.lastFeedbackText ||
+            summary.lastFeedback ||
+            summary.feedback ||
+            record?.lastFeedbackText ||
+            record?.feedback ||
+            null;
+        if (direct && String(direct).trim()) return String(direct).trim();
+
+        const msgs = record?.messages;
+        if (Array.isArray(msgs) && msgs.length > 0) {
+            const withFb = msgs
+                .filter((m) => String(m?.feedback || '').trim())
+                .sort((a, b) => new Date(a?.sentAt || 0) - new Date(b?.sentAt || 0));
+            const last = withFb[withFb.length - 1];
+            if (last && String(last.feedback || '').trim()) return String(last.feedback).trim();
+        }
+    } catch (_) { /* ignore */ }
+    return '';
+};
+
+const hasGoodAnswer = (record) => {
+    try {
+        if (record?.summary?.hasGoodAnswer === true) return true;
+        if (record?.summary?.hasGoodAnswers === true) return true;
+        if (Number(record?.summary?.goodAnswerCount || 0) > 0) return true;
+        const msgs = record?.messages;
+        if (Array.isArray(msgs) && msgs.some((m) => m?.isGoodAnswer === true || m?.goodAnswer === true || m?.good === true)) return true;
+    } catch (_) { /* ignore */ }
+    return false;
+};
+
 const hasPruebaMessage = (record) => {
     try {
         const preview = String(record?.summary?.lastMessagePreview || '');
@@ -70,14 +105,25 @@ const hasPruebaMessage = (record) => {
 const FeedbackDots = ({ record }) => {
     const hasFeedback = hasConversationFeedback(record);
     const hasPrueba = hasPruebaMessage(record);
-    if (!hasFeedback && !hasPrueba) return null;
+    const good = hasGoodAnswer(record);
+    if (!hasFeedback && !hasPrueba && !good) return null;
+
+    const fbTxt = hasFeedback ? getLastFeedbackText(record) : '';
+    const fbTitle = fbTxt ? `Feedback: ${fbTxt}` : 'Este chat tiene feedback';
 
     return (
         <span className="inline-flex items-center gap-1 leading-none">
             {hasFeedback ? (
-                <Tooltip title="Este chat tiene feedback">
+                <Tooltip title={fbTitle}>
                     <span className="inline-flex leading-none">
                         <Badge className="im-feedback-dot" dot color="#faad14" />
+                    </span>
+                </Tooltip>
+            ) : null}
+            {good ? (
+                <Tooltip title="Bien respondido">
+                    <span className="inline-flex leading-none">
+                        <Badge className="im-feedback-dot" dot color="#2f54eb" />
                     </span>
                 </Tooltip>
             ) : null}
