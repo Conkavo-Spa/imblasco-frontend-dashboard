@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Badge, Button, Card, Empty, Input, List, Modal, Tag, message } from 'antd';
-import { ArrowLeftOutlined, EditOutlined, MessageOutlined } from '@ant-design/icons';
+import { Badge, Button, Card, Checkbox, Empty, Input, List, Modal, Tag, Tooltip, message } from 'antd';
+import { ArrowLeftOutlined, EditOutlined, InfoCircleOutlined, MessageOutlined } from '@ant-design/icons';
 import Sidebar from '../../components/Sidebar';
 import EmailConversations from '../../services/EmailConversations';
 
@@ -25,6 +25,69 @@ const MailThread = () => {
     const [feedbackText, setFeedbackText] = useState('');
     const [selectedMessageId, setSelectedMessageId] = useState(null);
     const [isSavingFeedback, setIsSavingFeedback] = useState(false);
+    const [isSavingGoodAnswer, setIsSavingGoodAnswer] = useState(false);
+    const [isGoodAnswerDisabled, setIsGoodAnswerDisabled] = useState(false);
+
+    // Limpiar modales al desmontar
+    useEffect(() => {
+        return () => {
+            try {
+                Modal.destroyAll();
+                document.body.classList.remove('ant-modal-open');
+            } catch (_) {}
+        };
+    }, []);
+
+    // Volver a la página correcta
+    const goBack = () => {
+        try {
+            const q = new URLSearchParams(location.search || '');
+            const qp = Number(q.get('fromPage') || '0');
+            if (Number.isFinite(qp) && qp > 0) {
+                navigate(`/mails?page=${qp}`, { replace: true });
+                return;
+            }
+        } catch (_) {}
+        navigate('/mails', { replace: true });
+    };
+
+    const handleGoodAnswerChange = async (e) => {
+        const next = e.target.checked;
+        setConversation((prev) => ({
+            ...prev,
+            isGoodAnswer: next,
+            summary: { ...(prev?.summary || {}), hasGoodAnswer: next },
+        }));
+        setIsSavingGoodAnswer(true);
+        try {
+            const resp = await EmailConversations.setConversationGoodAnswer(conversation._id, next);
+            const ok = resp?.data?.success ?? resp?.success;
+            if (ok) {
+                message.success(resp?.data?.message || resp?.message || 'Actualizado');
+            } else {
+                message.warning(resp?.data?.message || resp?.message || 'No se pudo guardar');
+                setConversation((prev) => ({
+                    ...prev,
+                    isGoodAnswer: !next,
+                    summary: { ...(prev?.summary || {}), hasGoodAnswer: !next },
+                }));
+            }
+        } catch (err) {
+            if (err?.response?.status === 404) {
+                message.warning('El backend aún no soporta "Bien respondido" para mails.');
+                setIsGoodAnswerDisabled(true);
+            } else {
+                message.error(err?.response?.data?.message || err.message || 'Error al guardar');
+            }
+            setConversation((prev) => ({
+                ...prev,
+                isGoodAnswer: !next,
+                summary: { ...(prev?.summary || {}), hasGoodAnswer: !next },
+            }));
+        } finally {
+            setIsSavingGoodAnswer(false);
+        }
+    };
 
     const messagesSorted = useMemo(() => {
         const msgs = conversation?.messages || [];
@@ -37,7 +100,7 @@ const MailThread = () => {
                 <Sidebar />
                 <div className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto pb-8">
                     <div className="flex items-center gap-3 mb-6">
-                        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/mails')}>
+                        <Button icon={<ArrowLeftOutlined />} onClick={goBack}>
                             Volver
                         </Button>
                         <h1 className="text-2xl font-extrabold text-[#370776]">
@@ -66,7 +129,7 @@ const MailThread = () => {
             <div className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto pb-8">
                 <div className="flex flex-col gap-3 mb-6">
                     <div className="flex flex-wrap items-center gap-2">
-                        <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/mails')} className="w-fit">
+                        <Button icon={<ArrowLeftOutlined />} onClick={goBack} className="w-fit">
                             Volver
                         </Button>
                     </div>
@@ -104,6 +167,20 @@ const MailThread = () => {
                             Mensajes: <b>{conversation.summary?.messageCount ?? messagesSorted.length}</b>
                             {' · '}
                             No leídos: <b>{conversation.summary?.unreadCount ?? 0}</b>
+                        </div>
+                        <div className="mt-4">
+                            <Checkbox
+                                checked={conversation.isGoodAnswer === true || conversation.summary?.hasGoodAnswer === true}
+                                onChange={handleGoodAnswerChange}
+                                disabled={isSavingGoodAnswer || isGoodAnswerDisabled}
+                            >
+                                Bien respondido
+                            </Checkbox>
+                            {isGoodAnswerDisabled ? (
+                                <Tooltip title="Tu backend aún no soporta 'Bien respondido' para mails o hubo un error.">
+                                    <InfoCircleOutlined style={{ marginLeft: 8, color: 'rgba(0,0,0,.45)' }} />
+                                </Tooltip>
+                            ) : null}
                         </div>
                     </Card>
 

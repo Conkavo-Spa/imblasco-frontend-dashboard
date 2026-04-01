@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Sidebar from '../../components/Sidebar';
 import {
     Table,
@@ -10,10 +10,15 @@ import {
     Empty,
     Button,
     Tag,
+    Badge,
+    Tooltip,
+    Popconfirm,
+    message,
 } from 'antd';
 import useEmailConversations from '../../hooks/useEmailConversations';
 import { useMediaQuery } from 'react-responsive';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import EmailConversations from '../../services/EmailConversations';
 
 // Diccionarios para valores "técnicos" → texto amigable
 const CLASIFICACIONES = {
@@ -70,6 +75,65 @@ const formatDate = (date) => {
     });
 };
 
+// --- Helpers para puntos de estado ---
+const hasMailFeedback = (record) => {
+    if (record?.summary?.hasFeedback) return true;
+    const msgs = record?.messages || [];
+    return msgs.some((m) => Boolean(String(m.feedback || '').trim()));
+};
+const getLatestMailFeedbackText = (record) => {
+    if (record?.summary?.lastFeedbackText) return record.summary.lastFeedbackText;
+    const msgs = [...(record?.messages || [])].reverse();
+    for (const m of msgs) {
+        const t = String(m.feedback || '').trim();
+        if (t) return t;
+    }
+    return '';
+};
+const hasPruebaMail = (record) => {
+    const msgs = record?.messages || [];
+    return msgs.some((m) => {
+        const txt = String(m.content?.text || m.body || '').trimStart();
+        return txt.toUpperCase().startsWith('PRUEBA');
+    });
+};
+const hasMailGoodAnswer = (record) =>
+    record?.summary?.hasGoodAnswer === true || record?.isGoodAnswer === true;
+
+const MailFeedbackDots = ({ record }) => {
+    const hasFeedback = hasMailFeedback(record);
+    const hasPrueba = hasPruebaMail(record);
+    const hasGoodAnswer = hasMailGoodAnswer(record);
+    if (!hasFeedback && !hasPrueba && !hasGoodAnswer) return null;
+    const fbTxt = getLatestMailFeedbackText(record);
+    const fbTitle = fbTxt ? `Feedback: ${fbTxt}` : 'Este mail tiene feedback';
+    return (
+        <span className="inline-flex items-center gap-1 leading-none">
+            {hasFeedback ? (
+                <Tooltip title={fbTitle}>
+                    <span className="inline-flex leading-none">
+                        <Badge className="im-feedback-dot" dot color="#faad14" />
+                    </span>
+                </Tooltip>
+            ) : null}
+            {hasGoodAnswer ? (
+                <Tooltip title="Bien respondido">
+                    <span className="inline-flex leading-none">
+                        <Badge className="im-feedback-dot" dot color="#52c41a" />
+                    </span>
+                </Tooltip>
+            ) : null}
+            {hasPrueba ? (
+                <Tooltip title="Mail de prueba">
+                    <span className="inline-flex leading-none">
+                        <Badge className="im-feedback-dot" dot color="#1677ff" />
+                    </span>
+                </Tooltip>
+            ) : null}
+        </span>
+    );
+};
+
 const Mails = () => {
     const [emailQuery, setEmailQuery] = useState('');
     const [dateFilter, setDateFilter] = useState(null);
@@ -80,6 +144,35 @@ const Mails = () => {
 
     const isMobile = useMediaQuery({ maxWidth: 768 });
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Sincronizar currentPage con ?page= de la URL
+    useEffect(() => {
+        const q = new URLSearchParams(location.search || '');
+        const p = Number(q.get('page') || '1');
+        const page = Number.isFinite(p) && p > 0 ? p : 1;
+        setCurrentPage(page);
+    }, [location.search]);
+
+    const isCesar = useMemo(() => {
+        try {
+            const raw = localStorage.getItem('user');
+            const user = raw ? JSON.parse(raw) : null;
+            return user?.email === 'cesar.barahona@conkavo.cl';
+        } catch (_) {
+            return false;
+        }
+    }, []);
+
+    const handleMailDelete = async (id) => {
+        try {
+            await EmailConversations.deleteConversation(String(id));
+            message.success('Hilo eliminado');
+            navigate('/mails', { replace: true });
+        } catch (err) {
+            message.error(err?.response?.data?.message || 'No se pudo eliminar');
+        }
+    };
 
     const { data, isLoading } = useEmailConversations({ page: 1, limit: 100 });
 
@@ -189,17 +282,37 @@ const Mails = () => {
         {
             title: <span className="whitespace-nowrap">Detalle</span>,
             key: 'actions',
-            width: 110,
+            width: isCesar ? 170 : 120,
             align: 'center',
             render: (_, record) => (
-                <Button
-                    type="primary"
-                    size="small"
-                    style={{ width: '100%', maxWidth: '100%' }}
-                    onClick={() => navigate(`/mails/${String(record._id)}`, { state: { conversation: record } })}
-                >
-                    Detalle
-                </Button>
+                <div className="flex items-center justify-center gap-2 leading-none">
+                    <MailFeedbackDots record={record} />
+                    <Button
+                        type="primary"
+                        size="small"
+                        onClick={() => {
+                            const q = new URLSearchParams(location.search || '');
+                            q.set('fromPage', String(currentPage));
+                            navigate(`/mails/${String(record._id)}?${q.toString()}`, { state: { conversation: record } });
+                        }}
+                    >
+                        Detalle
+                    </Button>
+                    {isCesar ? (
+                        <Popconfirm
+                            title="¿Eliminar este hilo?"
+                            description="Esta acción no se puede deshacer."
+                            onConfirm={() => handleMailDelete(record._id)}
+                            okText="Eliminar"
+                            cancelText="Cancelar"
+                            okButtonProps={{ danger: true }}
+                        >
+                            <Button type="link" danger size="small">
+                                Eliminar
+                            </Button>
+                        </Popconfirm>
+                    ) : null}
+                </div>
             ),
         },
     ];
@@ -295,7 +408,16 @@ const Mails = () => {
                             dataSource={dataToRender}
                             columns={columns}
                             loading={isLoading}
-                            pagination={{ pageSize: itemsPerPage }}
+                            pagination={{
+                                pageSize: itemsPerPage,
+                                current: currentPage,
+                                onChange: (page) => {
+                                    setCurrentPage(page);
+                                    const q = new URLSearchParams(location.search || '');
+                                    q.set('page', String(page));
+                                    navigate(`/mails?${q.toString()}`, { replace: true });
+                                },
+                            }}
                             bordered
                             tableLayout="fixed"
                             size="small"
@@ -338,15 +460,33 @@ const Mails = () => {
                                                 <p>
                                                     <b>Estado:</b> {humanizeDict(THREAD_STATES, conv.estado ?? conv.status?.state)}
                                                 </p>
-                                                <div className="mt-3">
+                                                <div className="mt-3 flex items-center gap-2">
+                                                    <MailFeedbackDots record={conv} />
                                                     <Button
                                                         type="primary"
                                                         size="small"
-                                                        style={{ maxWidth: '100%' }}
-                                                        onClick={() => navigate(`/mails/${String(conv._id)}`, { state: { conversation: conv } })}
+                                                        onClick={() => {
+                                                            const q = new URLSearchParams(location.search || '');
+                                                            q.set('fromPage', String(currentPage));
+                                                            navigate(`/mails/${String(conv._id)}?${q.toString()}`, { state: { conversation: conv } });
+                                                        }}
                                                     >
                                                         Detalle
                                                     </Button>
+                                                    {isCesar ? (
+                                                        <Popconfirm
+                                                            title="¿Eliminar este hilo?"
+                                                            description="Esta acción no se puede deshacer."
+                                                            onConfirm={() => handleMailDelete(conv._id)}
+                                                            okText="Eliminar"
+                                                            cancelText="Cancelar"
+                                                            okButtonProps={{ danger: true }}
+                                                        >
+                                                            <Button type="link" danger size="small">
+                                                                Eliminar
+                                                            </Button>
+                                                        </Popconfirm>
+                                                    ) : null}
                                                 </div>
                                             </Card>
                                         ))}
