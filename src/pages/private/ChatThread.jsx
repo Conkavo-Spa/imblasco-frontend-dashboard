@@ -23,9 +23,21 @@ const ChatThread = () => {
     const location = useLocation();
 
     const goBack = () => {
-        // Preferimos "volver atrás" en historial; si no hay historial útil, caemos al listado de chats.
-        if (window.history.length > 1) navigate(-1);
-        else navigate('/chat');
+        // Preferimos "volver atrás" en historial.
+        if (window.history.length > 1) {
+            navigate(-1);
+            return;
+        }
+        // Sin historial útil: regresar a la última ruta privada guardada (ver App.jsx -> LAST_PATH_KEY)
+        try {
+            const last = sessionStorage.getItem('app_last_private_path');
+            if (last && last !== window.location.pathname) {
+                navigate(last, { replace: true });
+                return;
+            }
+        } catch (_) {}
+        // Fallback final
+        navigate('/chat', { replace: true });
     };
 
     const initialConversation = location.state?.conversation || null;
