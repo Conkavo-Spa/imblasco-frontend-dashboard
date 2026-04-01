@@ -69,6 +69,17 @@ const Chat = () => {
         // 3) Fallback: documento
         return document.scrollingElement || document.documentElement || document.body;
     };
+
+    const getBestScrollTop = () => {
+        const tableBody = document.querySelector('.ant-table-body');
+        const refEl = scrollRef.current;
+        const docEl = document.scrollingElement || document.documentElement || document.body;
+        return Math.max(
+            tableBody ? tableBody.scrollTop : 0,
+            refEl ? refEl.scrollTop : 0,
+            docEl ? docEl.scrollTop : 0
+        );
+    };
     const [currentPage, setCurrentPage] = useState(initial.page);
     const [dateFilter, setDateFilter] = useState(initial.date);
 
@@ -181,8 +192,7 @@ const Chat = () => {
                     onClick={() => {
                         try {
                             // eslint-disable-next-line no-console
-                            const el = getScrollElement();
-                            const y = el ? el.scrollTop : 0;
+                            const y = getBestScrollTop();
                             console.log('[chat][open-detail] store state', { page: currentPage, date: dateFilter, scrollY: y });
                             sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                 page: currentPage,
@@ -197,7 +207,7 @@ const Chat = () => {
                                     pathname: location.pathname,
                                     page: currentPage,
                                     date: dateFilter,
-                                    scrollY: (() => { const el = getScrollElement(); return el ? el.scrollTop : 0; })(),
+                                    scrollY: getBestScrollTop(),
                                 },
                             },
                         };
@@ -279,8 +289,7 @@ const Chat = () => {
                                                         onClick={() => {
                                                             try {
                                                                 // eslint-disable-next-line no-console
-                                                                const el = getScrollElement();
-                                                                const y = el ? el.scrollTop : 0;
+                                                                const y = getBestScrollTop();
                                                                 console.log('[chat][open-detail-mobile] store state', { page: currentPage, date: dateFilter, scrollY: y });
                                                                 sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                                                     page: currentPage,
@@ -295,7 +304,7 @@ const Chat = () => {
                                                                         pathname: location.pathname,
                                                                         page: currentPage,
                                                                         date: dateFilter,
-                                                                        scrollY: (() => { const el = getScrollElement(); return el ? el.scrollTop : 0; })(),
+                                                                        scrollY: getBestScrollTop(),
                                                                     },
                                                                 },
                                                             };
