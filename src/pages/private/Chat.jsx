@@ -69,7 +69,20 @@ const Chat = () => {
             key: 'customer',
             width: 160,
             ellipsis: true,
-            render: () => 'No identificado',
+            render: (_, record) => {
+                const customer =
+                    record?.participants?.customer ||
+                    {}; // posible ubicación enviada por backend
+                const customerName =
+                    customer?.name ||
+                    record?.summary?.customerName ||
+                    null;
+                const customerEmail =
+                    customer?.email ||
+                    record?.summary?.customerEmail ||
+                    null;
+                return customerName || customerEmail || 'No identificado';
+            },
         },
         {
             title: <span className="whitespace-nowrap">Último mensaje</span>,

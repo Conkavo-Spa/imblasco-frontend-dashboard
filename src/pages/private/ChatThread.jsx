@@ -84,7 +84,9 @@ const ChatThread = () => {
                     <Card className="shadow border-[#370776]/10" title="Participantes">
                         <div className="mb-3">
                             <div className="font-semibold text-gray-800">Cliente</div>
-                            <div className="text-gray-700">No identificado</div>
+                            <div className="text-gray-700">
+                                {customer?.name || customer?.email || 'No identificado'}
+                            </div>
                         </div>
                         <div>
                             <div className="font-semibold text-gray-800">Agente</div>
@@ -106,6 +108,9 @@ const ChatThread = () => {
                             <div><b>ID:</b> {String(conversation._id)}</div>
                             <div><b>Provider:</b> {conversation.provider || '—'}</div>
                             <div><b>Canal:</b> {conversation.channel || '—'}</div>
+                            {conversation?.summary?.lastSeenIp ? (
+                                <div><b>IP última vista:</b> {conversation.summary.lastSeenIp}</div>
+                            ) : null}
                         </div>
                     </Card>
                 </div>
