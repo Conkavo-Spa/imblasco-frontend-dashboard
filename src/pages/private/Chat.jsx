@@ -73,15 +73,19 @@ const FeedbackDots = ({ record }) => {
     if (!hasFeedback && !hasPrueba) return null;
 
     return (
-        <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-1 leading-none">
             {hasFeedback ? (
                 <Tooltip title="Este chat tiene feedback">
-                    <Badge className="im-feedback-dot" dot color="#faad14" />
+                    <span className="inline-flex leading-none">
+                        <Badge className="im-feedback-dot" dot color="#faad14" />
+                    </span>
                 </Tooltip>
             ) : null}
             {hasPrueba ? (
                 <Tooltip title="Chat de prueba">
-                    <Badge className="im-feedback-dot" dot color="#1677ff" />
+                    <span className="inline-flex leading-none">
+                        <Badge className="im-feedback-dot" dot color="#1677ff" />
+                    </span>
                 </Tooltip>
             ) : null}
         </span>
@@ -251,7 +255,7 @@ const Chat = () => {
             width: 110,
             align: 'center',
             render: (_, record) => (
-                <span className="inline-flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2 leading-none">
                     <FeedbackDots record={record} />
                     <Button
                         type="primary"
@@ -273,7 +277,7 @@ const Chat = () => {
                     >
                         Detalle
                     </Button>
-                </span>
+                </div>
             ),
         },
     ];
