@@ -21,6 +21,9 @@ class ConversationsService {
 
     setConversationGoodAnswer = (conversationId, isGood) =>
         instance.put(`/conversations/${conversationId}/good-answer`, { isGood: isGood === true });
+
+    deleteConversation = (conversationId) =>
+        instance.delete(`/conversations/${conversationId}`);
 }
 
 const Conversations = new ConversationsService();

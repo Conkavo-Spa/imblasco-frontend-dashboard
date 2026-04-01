@@ -9,9 +9,12 @@ import {
     DatePicker,
     Badge,
     Tooltip,
+    Popconfirm,
+    message,
 } from 'antd';
 // icon removed to fit column width
 import useConversations from '../../hooks/useConversations';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMediaQuery } from 'react-responsive';
 import { useLocation, useNavigate } from 'react-router-dom';
 
@@ -194,6 +197,7 @@ const Chat = () => {
     const isMobile = useMediaQuery({ maxWidth: 768 });
     const navigate = useNavigate();
     const location = useLocation();
+    const queryClient = useQueryClient();
 
     const { data, isLoading } = useConversations({ channel: 'chat', page: 1, limit: 100 });
 
@@ -298,7 +302,7 @@ const Chat = () => {
         {
             title: <span className="whitespace-nowrap">Detalle</span>,
             key: 'actions',
-            width: 110,
+            width: 160,
             align: 'center',
             render: (_, record) => (
                 <div className="flex items-center justify-center gap-2 leading-none">
@@ -323,6 +327,26 @@ const Chat = () => {
                     >
                         Detalle
                     </Button>
+                    <Popconfirm
+                        title="Eliminar hilo"
+                        description="¿Seguro que quieres eliminar esta conversación?"
+                        okText="Eliminar"
+                        cancelText="Cancelar"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={async () => {
+                            try {
+                                await Conversations.deleteConversation(String(record._id));
+                                message.success('Hilo eliminado');
+                                queryClient.invalidateQueries({ queryKey: ['conversations'] });
+                            } catch (err) {
+                                message.error(err?.response?.data?.message || err.message || 'No se pudo eliminar');
+                            }
+                        }}
+                    >
+                        <Button danger size="small">
+                            Eliminar
+                        </Button>
+                    </Popconfirm>
                 </div>
             ),
         },
