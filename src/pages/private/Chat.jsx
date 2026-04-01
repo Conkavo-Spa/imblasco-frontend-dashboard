@@ -70,6 +70,7 @@ const Chat = () => {
             width: 160,
             ellipsis: true,
             render: (_, record) => {
+                // Datos de cliente enviados por backend
                 const customer =
                     record?.participants?.customer ||
                     {}; // posible ubicación enviada por backend
@@ -81,7 +82,20 @@ const Chat = () => {
                     customer?.email ||
                     record?.summary?.customerEmail ||
                     null;
-                return customerName || customerEmail || 'No identificado';
+
+                const identified = customerName || customerEmail;
+                if (identified) return identified;
+
+                // Regla solicitada: solo para el usuario cesar, mostrar IP si no hay datos
+                try {
+                    const raw = localStorage.getItem('user');
+                    const user = raw ? JSON.parse(raw) : null;
+                    if (user?.email === 'cesar.barahona@conkavo.cl') {
+                        return record?.summary?.lastSeenIp || 'No identificado';
+                    }
+                } catch (_) { /* ignore */ }
+
+                return 'No identificado';
             },
         },
         {
