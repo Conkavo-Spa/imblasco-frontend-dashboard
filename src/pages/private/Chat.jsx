@@ -58,6 +58,17 @@ const Chat = () => {
 
     const initial = loadInitialState();
     const scrollRef = useRef(null);
+
+    // Obtiene el elemento que realmente scrollea (tabla, contenedor o documento)
+    const getScrollElement = () => {
+        // 1) Cuerpo de tabla de AntD si existe
+        const tableBody = document.querySelector('.ant-table-body');
+        if (tableBody && tableBody.scrollHeight > tableBody.clientHeight) return tableBody;
+        // 2) Nuestro contenedor principal con overflow-y-auto
+        if (scrollRef.current && scrollRef.current.scrollHeight > scrollRef.current.clientHeight) return scrollRef.current;
+        // 3) Fallback: documento
+        return document.scrollingElement || document.documentElement || document.body;
+    };
     const [currentPage, setCurrentPage] = useState(initial.page);
     const [dateFilter, setDateFilter] = useState(initial.date);
 
@@ -75,11 +86,10 @@ const Chat = () => {
             console.log('[chat][mount] initial state', initial);
         } catch (_) {}
         const y = Number(initial.scrollY) || 0;
-        if (y && scrollRef.current) {
+        if (y) {
             setTimeout(() => {
-                if (scrollRef.current) {
-                    scrollRef.current.scrollTop = y;
-                }
+                const el = getScrollElement();
+                if (el) el.scrollTop = y;
             }, 0);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -171,13 +181,13 @@ const Chat = () => {
                     onClick={() => {
                         try {
                             // eslint-disable-next-line no-console
-                            console.log('[chat][open-detail] store state', {
-                                page: currentPage, date: dateFilter, scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
-                            });
+                            const el = getScrollElement();
+                            const y = el ? el.scrollTop : 0;
+                            console.log('[chat][open-detail] store state', { page: currentPage, date: dateFilter, scrollY: y });
                             sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                 page: currentPage,
                                 date: dateFilter,
-                                scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
+                                scrollY: y,
                             }));
                         } catch (_) {}
                         const nextState = {
@@ -187,7 +197,7 @@ const Chat = () => {
                                     pathname: location.pathname,
                                     page: currentPage,
                                     date: dateFilter,
-                                    scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
+                                    scrollY: (() => { const el = getScrollElement(); return el ? el.scrollTop : 0; })(),
                                 },
                             },
                         };
@@ -269,13 +279,13 @@ const Chat = () => {
                                                         onClick={() => {
                                                             try {
                                                                 // eslint-disable-next-line no-console
-                                                                console.log('[chat][open-detail-mobile] store state', {
-                                                                    page: currentPage, date: dateFilter, scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
-                                                                });
+                                                                const el = getScrollElement();
+                                                                const y = el ? el.scrollTop : 0;
+                                                                console.log('[chat][open-detail-mobile] store state', { page: currentPage, date: dateFilter, scrollY: y });
                                                                 sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
                                                                     page: currentPage,
                                                                     date: dateFilter,
-                                                                    scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
+                                                                    scrollY: y,
                                                                 }));
                                                             } catch (_) {}
                                                             const nextState = {
@@ -285,7 +295,7 @@ const Chat = () => {
                                                                         pathname: location.pathname,
                                                                         page: currentPage,
                                                                         date: dateFilter,
-                                                                        scrollY: scrollRef.current ? scrollRef.current.scrollTop : 0,
+                                                                        scrollY: (() => { const el = getScrollElement(); return el ? el.scrollTop : 0; })(),
                                                                     },
                                                                 },
                                                             };
