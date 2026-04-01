@@ -23,20 +23,24 @@ const ChatThread = () => {
     const location = useLocation();
 
     const goBack = () => {
-        // Preferimos "volver atrás" en historial.
+        // Si el listado nos pasó un "from", úsalo para restaurar exactamente su estado.
+        const from = location.state?.from;
+        if (from) {
+            try {
+                sessionStorage.setItem('chat_list_state', JSON.stringify({
+                    page: Number(from.page) > 0 ? Number(from.page) : 1,
+                    date: from.date || null,
+                    scrollY: Number.isFinite(from.scrollY) ? Number(from.scrollY) : 0,
+                }));
+            } catch (_) {}
+            navigate('/chat', { replace: true });
+            return;
+        }
+        // Si no tenemos "from", intentar historial y luego caer al listado.
         if (window.history.length > 1) {
             navigate(-1);
             return;
         }
-        // Sin historial útil: regresar a la última ruta privada guardada (ver App.jsx -> LAST_PATH_KEY)
-        try {
-            const last = sessionStorage.getItem('app_last_private_path');
-            if (last && last !== window.location.pathname) {
-                navigate(last, { replace: true });
-                return;
-            }
-        } catch (_) {}
-        // Fallback final
         navigate('/chat', { replace: true });
     };
 

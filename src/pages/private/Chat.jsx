@@ -11,7 +11,7 @@ import {
 // icon removed to fit column width
 import useConversations from '../../hooks/useConversations';
 import { useMediaQuery } from 'react-responsive';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 const toYMD = (value) => {
     if (!value) return '';
@@ -62,6 +62,7 @@ const Chat = () => {
 
     const isMobile = useMediaQuery({ maxWidth: 768 });
     const navigate = useNavigate();
+    const location = useLocation();
 
     const { data, isLoading } = useConversations({ channel: 'chat', page: 1, limit: 100 });
 
@@ -164,7 +165,17 @@ const Chat = () => {
                                 scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
                             }));
                         } catch (_) {}
-                        navigate(`/chat/${String(record._id)}`, { state: { conversation: record } });
+                        navigate(`/chat/${String(record._id)}`, {
+                            state: {
+                                conversation: record,
+                                from: {
+                                    pathname: location.pathname,
+                                    page: currentPage,
+                                    date: dateFilter,
+                                    scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                },
+                            },
+                        });
                     }}
                 >
                     Detalle
@@ -243,7 +254,17 @@ const Chat = () => {
                                                                     scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
                                                                 }));
                                                             } catch (_) {}
-                                                            navigate(`/chat/${String(conv._id)}`, { state: { conversation: conv } });
+                                                            navigate(`/chat/${String(conv._id)}`, {
+                                                                state: {
+                                                                    conversation: conv,
+                                                                    from: {
+                                                                        pathname: location.pathname,
+                                                                        page: currentPage,
+                                                                        date: dateFilter,
+                                                                        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+                                                                    },
+                                                                },
+                                                            });
                                                         }}
                                                     >
                                                         Detalle
