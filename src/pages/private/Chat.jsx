@@ -7,6 +7,7 @@ import {
     Empty,
     Button,
     DatePicker,
+    Badge,
 } from 'antd';
 // icon removed to fit column width
 import useConversations from '../../hooks/useConversations';
@@ -40,6 +41,18 @@ const formatDate = (date) => {
 
 const CHAT_LIST_STATE = 'chat_list_state';
 const CHAT_LAST_PAGE = 'chat_last_page';
+
+const hasConversationFeedback = (record) => {
+    try {
+        if (record?.summary?.hasFeedback === true) return true;
+        if (Number(record?.summary?.feedbackCount || 0) > 0) return true;
+        if (Number(record?.summary?.messageFeedbackCount || 0) > 0) return true;
+        if (record?.hasFeedback === true) return true;
+        const msgs = record?.messages;
+        if (Array.isArray(msgs) && msgs.some((m) => String(m?.feedback || '').trim())) return true;
+    } catch (_) { /* ignore */ }
+    return false;
+};
 
 const Chat = () => {
     const loadInitialState = () => {
@@ -203,26 +216,28 @@ const Chat = () => {
             width: 110,
             align: 'center',
             render: (_, record) => (
-                <Button
-                    type="primary"
-                    size="small"
-                    style={{ maxWidth: '100%' }}
-                    onClick={() => {
-                        try { sessionStorage.setItem(CHAT_LAST_PAGE, String(currentPage)); } catch (_) {}
-                        const nextState = {
-                            state: {
-                                conversation: record,
-                                from: {
-                                    pathname: location.pathname,
-                                    page: currentPage,
+                <Badge dot={hasConversationFeedback(record)} color="#faad14" offset={[2, 0]}>
+                    <Button
+                        type="primary"
+                        size="small"
+                        style={{ maxWidth: '100%' }}
+                        onClick={() => {
+                            try { sessionStorage.setItem(CHAT_LAST_PAGE, String(currentPage)); } catch (_) {}
+                            const nextState = {
+                                state: {
+                                    conversation: record,
+                                    from: {
+                                        pathname: location.pathname,
+                                        page: currentPage,
+                                    },
                                 },
-                            },
-                        };
-                        navigate(`/chat/${String(record._id)}?fromPage=${currentPage}`, nextState);
-                    }}
-                >
-                    Detalle
-                </Button>
+                            };
+                            navigate(`/chat/${String(record._id)}?fromPage=${currentPage}`, nextState);
+                        }}
+                    >
+                        Detalle
+                    </Button>
+                </Badge>
             ),
         },
     ];
@@ -280,7 +295,12 @@ const Chat = () => {
                                         {paginatedData.map((conv) => (
                                             <Card
                                                 key={conv._id}
-                                                title="No identificado"
+                                                title={
+                                                    <span className="flex items-center gap-2">
+                                                        {hasConversationFeedback(conv) ? <Badge dot color="#faad14" /> : null}
+                                                        <span>No identificado</span>
+                                                    </span>
+                                                }
                                                 bordered
                                                 className="shadow border-[#370776]/20"
                                             >
