@@ -23,25 +23,11 @@ const ChatThread = () => {
     const location = useLocation();
 
     const goBack = () => {
-        // Si el listado nos pasó un "from", úsalo para restaurar exactamente su estado.
-        const from = location.state?.from;
-        if (from) {
-            try {
-                sessionStorage.setItem('chat_list_state', JSON.stringify({
-                    page: Number(from.page) > 0 ? Number(from.page) : 1,
-                    date: from.date || null,
-                    scrollY: Number.isFinite(from.scrollY) ? Number(from.scrollY) : 0,
-                }));
-            } catch (_) {}
-            navigate('/chat', { replace: true });
-            return;
-        }
-        // Si no tenemos "from", intentar historial y luego caer al listado.
-        if (window.history.length > 1) {
-            navigate(-1);
-            return;
-        }
-        navigate('/chat', { replace: true });
+        // Volver a la página guardada de listado (simple y predecible)
+        const raw = sessionStorage.getItem('chat_last_page');
+        const p = Number(raw || '1');
+        const page = Number.isFinite(p) && p > 0 ? p : 1;
+        navigate(`/chat?page=${page}`, { replace: true });
     };
 
     const initialConversation = location.state?.conversation || null;

@@ -39,6 +39,7 @@ const formatDate = (date) => {
 };
 
 const CHAT_LIST_STATE = 'chat_list_state';
+const CHAT_LAST_PAGE = 'chat_last_page';
 
 const Chat = () => {
     const loadInitialState = () => {
@@ -80,7 +81,17 @@ const Chat = () => {
             docEl ? docEl.scrollTop : 0
         );
     };
-    const [currentPage, setCurrentPage] = useState(initial.page);
+    // Página inicial desde query ?page=..., fallback a session/1
+    const getInitialPageFromQuery = () => {
+        try {
+            const q = new URLSearchParams(location.search || '');
+            const p = Number(q.get('page') || '0');
+            if (Number.isFinite(p) && p > 0) return p;
+        } catch (_) {}
+        return initial.page || 1;
+    };
+
+    const [currentPage, setCurrentPage] = useState(getInitialPageFromQuery());
     const [dateFilter, setDateFilter] = useState(initial.date);
 
     const isMobile = useMediaQuery({ maxWidth: 768 });
@@ -185,23 +196,13 @@ const Chat = () => {
                     size="small"
                     style={{ maxWidth: '100%' }}
                     onClick={() => {
-                        try {
-                            // eslint-disable-next-line no-console
-                            const y = getBestScrollTop();
-                            sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
-                                page: currentPage,
-                                date: dateFilter,
-                                scrollY: y,
-                            }));
-                        } catch (_) {}
+                        try { sessionStorage.setItem(CHAT_LAST_PAGE, String(currentPage)); } catch (_) {}
                         const nextState = {
                             state: {
                                 conversation: record,
                                 from: {
                                     pathname: location.pathname,
                                     page: currentPage,
-                                    date: dateFilter,
-                                    scrollY: getBestScrollTop(),
                                 },
                             },
                         };
@@ -277,23 +278,13 @@ const Chat = () => {
                                                         size="small"
                                                         style={{ maxWidth: '100%' }}
                                                         onClick={() => {
-                                                            try {
-                                                                // eslint-disable-next-line no-console
-                                                                const y = getBestScrollTop();
-                                                                sessionStorage.setItem(CHAT_LIST_STATE, JSON.stringify({
-                                                                    page: currentPage,
-                                                                    date: dateFilter,
-                                                                    scrollY: y,
-                                                                }));
-                                                            } catch (_) {}
+                                                            try { sessionStorage.setItem(CHAT_LAST_PAGE, String(currentPage)); } catch (_) {}
                                                             const nextState = {
                                                                 state: {
                                                                     conversation: conv,
                                                                     from: {
                                                                         pathname: location.pathname,
                                                                         page: currentPage,
-                                                                        date: dateFilter,
-                                                                        scrollY: getBestScrollTop(),
                                                                     },
                                                                 },
                                                             };
