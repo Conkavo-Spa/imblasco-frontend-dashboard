@@ -129,7 +129,7 @@ const FeedbackDots = ({ record }) => {
         <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: color, flexShrink: 0 }} />
     );
     return (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 68, justifyContent: 'flex-end' }}>
             {hasFeedback ? <Tooltip title={fbTitle}>{dot('#faad14')}</Tooltip> : null}
             {good ? <Tooltip title="Bien respondido">{dot('#52c41a')}</Tooltip> : null}
             {corrected ? <Tooltip title="Corregida">{dot('#722ed1')}</Tooltip> : null}
