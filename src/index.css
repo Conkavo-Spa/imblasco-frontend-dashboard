@@ -77,7 +77,8 @@ body {
 }
 
 /* Badge dot (feedback/prueba/bien respondido) */
-.im-feedback-dot .ant-badge-dot {
+.im-feedback-dot .ant-badge-dot,
+.im-feedback-dot .ant-badge-status-dot {
     width: 16px !important;
     height: 16px !important;
     min-width: 16px !important;
