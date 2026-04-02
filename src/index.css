@@ -82,4 +82,8 @@ body {
     width: 16px !important;
     height: 16px !important;
     min-width: 16px !important;
+    vertical-align: middle !important;
+    position: relative !important;
+    top: 0 !important;
+    display: inline-block !important;
 }

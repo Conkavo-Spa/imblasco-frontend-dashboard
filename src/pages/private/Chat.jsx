@@ -151,7 +151,7 @@ const FeedbackDots = ({ record }) => {
             {hasPrueba ? (
                 <Tooltip title="Chat de prueba">
                     <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <Badge className="im-feedback-dot" dot color="#1677ff" />
+                        <Badge className="im-feedback-dot" dot color="#000000" />
                     </span>
                 </Tooltip>
             ) : null}
