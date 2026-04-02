@@ -125,36 +125,15 @@ const FeedbackDots = ({ record }) => {
     const fbTxt = hasFeedback ? getLastFeedbackText(record) : '';
     const fbTitle = fbTxt ? `Feedback: ${fbTxt}` : 'Este chat tiene feedback';
 
+    const dot = (color) => (
+        <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: color, flexShrink: 0 }} />
+    );
     return (
-        <span className="inline-flex items-center gap-1" style={{ verticalAlign: 'middle', lineHeight: 1 }}>
-            {hasFeedback ? (
-                <Tooltip title={fbTitle}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <Badge className="im-feedback-dot" dot color="#faad14" />
-                    </span>
-                </Tooltip>
-            ) : null}
-            {good ? (
-                <Tooltip title="Bien respondido">
-                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <Badge className="im-feedback-dot" dot color="#52c41a" />
-                    </span>
-                </Tooltip>
-            ) : null}
-            {corrected ? (
-                <Tooltip title="Corregida">
-                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <Badge className="im-feedback-dot" dot color="#722ed1" />
-                    </span>
-                </Tooltip>
-            ) : null}
-            {hasPrueba ? (
-                <Tooltip title="Chat de prueba">
-                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <Badge className="im-feedback-dot" dot color="#000000" />
-                    </span>
-                </Tooltip>
-            ) : null}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {hasFeedback ? <Tooltip title={fbTitle}>{dot('#faad14')}</Tooltip> : null}
+            {good ? <Tooltip title="Bien respondido">{dot('#52c41a')}</Tooltip> : null}
+            {corrected ? <Tooltip title="Corregida">{dot('#722ed1')}</Tooltip> : null}
+            {hasPrueba ? <Tooltip title="Chat de prueba">{dot('#000000')}</Tooltip> : null}
         </span>
     );
 };
