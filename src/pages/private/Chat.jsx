@@ -126,31 +126,31 @@ const FeedbackDots = ({ record }) => {
     const fbTitle = fbTxt ? `Feedback: ${fbTxt}` : 'Este chat tiene feedback';
 
     return (
-        <span className="inline-flex items-center gap-1 leading-none">
+        <span className="inline-flex items-center gap-1" style={{ verticalAlign: 'middle', lineHeight: 1 }}>
             {hasFeedback ? (
                 <Tooltip title={fbTitle}>
-                    <span className="inline-flex leading-none">
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
                         <Badge className="im-feedback-dot" dot color="#faad14" />
                     </span>
                 </Tooltip>
             ) : null}
             {good ? (
                 <Tooltip title="Bien respondido">
-                    <span className="inline-flex leading-none">
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
                         <Badge className="im-feedback-dot" dot color="#52c41a" />
                     </span>
                 </Tooltip>
             ) : null}
             {corrected ? (
                 <Tooltip title="Corregida">
-                    <span className="inline-flex leading-none">
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
                         <Badge className="im-feedback-dot" dot color="#722ed1" />
                     </span>
                 </Tooltip>
             ) : null}
             {hasPrueba ? (
                 <Tooltip title="Chat de prueba">
-                    <span className="inline-flex leading-none">
+                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
                         <Badge className="im-feedback-dot" dot color="#1677ff" />
                     </span>
                 </Tooltip>
@@ -338,6 +338,7 @@ const Chat = () => {
         {
             title: <span className="whitespace-nowrap">Último mensaje</span>,
             key: 'preview',
+            width: 380,
             ellipsis: true,
             render: (_, record) => {
                 const preview = record.summary?.lastMessagePreview;
@@ -364,7 +365,7 @@ const Chat = () => {
             width: 160,
             align: 'center',
             render: (_, record) => (
-                <div className="flex items-center justify-center gap-2 leading-none">
+                <div className="flex items-center justify-center gap-1 leading-none">
                     <FeedbackDots record={record} />
                     <Button
                         type="primary"
