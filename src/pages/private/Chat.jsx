@@ -11,6 +11,7 @@ import {
     Tooltip,
     Popconfirm,
     message,
+    Modal,
 } from 'antd';
 // icon removed to fit column width
 import useConversations from '../../hooks/useConversations';
@@ -210,6 +211,37 @@ const Chat = () => {
         }
     })();
 
+    const [isExportOpen, setIsExportOpen] = useState(false);
+    const [exportFrom, setExportFrom] = useState(null);
+    const [exportTo, setExportTo] = useState(null);
+    const [isExporting, setIsExporting] = useState(false);
+
+    const handleExport = async () => {
+        setIsExporting(true);
+        try {
+            const from = exportFrom ? exportFrom.format('YYYY-MM-DD') : undefined;
+            const to = exportTo ? exportTo.format('YYYY-MM-DD') : undefined;
+            const resp = await Conversations.exportConversations(from, to);
+            const docs = resp?.data?.data ?? resp?.data ?? [];
+            const blob = new Blob([JSON.stringify(docs, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const filename = `chats_${from || 'inicio'}_${to || 'hoy'}.json`;
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            message.success(`Descargado: ${filename}`);
+            setIsExportOpen(false);
+        } catch (err) {
+            message.error(err?.response?.data?.message || 'No se pudo exportar');
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     const { data, isLoading } = useConversations({ channel: 'chat', page: 1, limit: 100 });
 
     // Sincronizar currentPage con la query cada vez que cambie la URL
@@ -371,7 +403,46 @@ const Chat = () => {
             <div ref={scrollRef} className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto overflow-x-auto pb-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-extrabold text-[#370776]">Chats</h1>
+                    {canDelete ? (
+                        <Button onClick={() => setIsExportOpen(true)}>
+                            Exportar JSON
+                        </Button>
+                    ) : null}
                 </div>
+
+                <Modal
+                    title="Exportar hilos a JSON"
+                    open={isExportOpen}
+                    onCancel={() => setIsExportOpen(false)}
+                    okText="Descargar"
+                    cancelText="Cancelar"
+                    confirmLoading={isExporting}
+                    onOk={handleExport}
+                >
+                    <div className="flex flex-col gap-4 py-2">
+                        <div>
+                            <div className="mb-1 text-gray-700">Desde:</div>
+                            <DatePicker
+                                value={exportFrom}
+                                onChange={(val) => setExportFrom(val)}
+                                className="w-full"
+                                placeholder="Fecha inicio (opcional)"
+                            />
+                        </div>
+                        <div>
+                            <div className="mb-1 text-gray-700">Hasta:</div>
+                            <DatePicker
+                                value={exportTo}
+                                onChange={(val) => setExportTo(val)}
+                                className="w-full"
+                                placeholder="Fecha fin (opcional)"
+                            />
+                        </div>
+                        <div className="text-gray-500 text-sm">
+                            Si no seleccionas fechas, se exportan todos los hilos.
+                        </div>
+                    </div>
+                </Modal>
 
                 <div className="mb-6 flex flex-col sm:flex-row gap-3">
                     <DatePicker

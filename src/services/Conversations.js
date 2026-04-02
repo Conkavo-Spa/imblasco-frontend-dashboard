@@ -24,6 +24,9 @@ class ConversationsService {
 
     deleteConversation = (conversationId) =>
         instance.delete(`/conversations/${conversationId}`);
+
+    exportConversations = (from, to) =>
+        instance.get('/conversations/export', { params: { channel: 'chat', from, to } });
 }
 
 const Conversations = new ConversationsService();
