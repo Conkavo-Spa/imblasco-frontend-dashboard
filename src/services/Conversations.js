@@ -25,6 +25,9 @@ class ConversationsService {
     deleteConversation = (conversationId) =>
         instance.delete(`/conversations/${conversationId}`);
 
+    setConversationCorrected = (conversationId, isCorrected) =>
+        instance.put(`/conversations/${conversationId}/corrected`, { isCorrected: isCorrected === true });
+
     exportConversations = (from, to) =>
         instance.get('/conversations/export', { params: { channel: 'chat', from, to } });
 }

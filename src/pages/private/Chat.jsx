@@ -95,6 +95,14 @@ const hasGoodAnswer = (record) => {
     return false;
 };
 
+const hasCorrected = (record) => {
+    try {
+        if (record?.isCorrected === true) return true;
+        if (record?.summary?.isCorrected === true) return true;
+    } catch (_) { /* ignore */ }
+    return false;
+};
+
 const hasPruebaMessage = (record) => {
     try {
         const preview = String(record?.summary?.lastMessagePreview || '');
@@ -111,7 +119,8 @@ const FeedbackDots = ({ record }) => {
     const hasFeedback = hasConversationFeedback(record);
     const hasPrueba = hasPruebaMessage(record);
     const good = hasGoodAnswer(record);
-    if (!hasFeedback && !hasPrueba && !good) return null;
+    const corrected = hasCorrected(record);
+    if (!hasFeedback && !hasPrueba && !good && !corrected) return null;
 
     const fbTxt = hasFeedback ? getLastFeedbackText(record) : '';
     const fbTitle = fbTxt ? `Feedback: ${fbTxt}` : 'Este chat tiene feedback';
@@ -129,6 +138,13 @@ const FeedbackDots = ({ record }) => {
                 <Tooltip title="Bien respondido">
                     <span className="inline-flex leading-none">
                         <Badge className="im-feedback-dot" dot color="#52c41a" />
+                    </span>
+                </Tooltip>
+            ) : null}
+            {corrected ? (
+                <Tooltip title="Corregida">
+                    <span className="inline-flex leading-none">
+                        <Badge className="im-feedback-dot" dot color="#722ed1" />
                     </span>
                 </Tooltip>
             ) : null}

@@ -53,6 +53,8 @@ const ChatThread = () => {
     const [isSavingFeedback, setIsSavingFeedback] = useState(false);
     const [isSavingGoodAnswer, setIsSavingGoodAnswer] = useState(false);
     const [isGoodAnswerSupported, setIsGoodAnswerSupported] = useState(true);
+    const [isSavingCorrected, setIsSavingCorrected] = useState(false);
+    const [isCorrectedSupported, setIsCorrectedSupported] = useState(true);
 
     // Si salimos de esta vista con un modal abierto, destruirlo para que no quede la máscara
     useEffect(() => {
@@ -173,6 +175,39 @@ const ChatThread = () => {
                                 }}
                             >
                                 Bien respondido
+                            </Checkbox>
+                            <Checkbox
+                                checked={conversation?.isCorrected === true || conversation?.summary?.isCorrected === true}
+                                disabled={isSavingCorrected || !isCorrectedSupported}
+                                onChange={async (e) => {
+                                    const next = e.target.checked === true;
+                                    setIsSavingCorrected(true);
+                                    try {
+                                        const resp = await Conversations.setConversationCorrected(conversation._id, next);
+                                        if (resp?.success) {
+                                            message.success(resp.message || 'Actualizado');
+                                            setConversation((prev) => ({
+                                                ...prev,
+                                                summary: { ...(prev?.summary || {}), isCorrected: next },
+                                                isCorrected: next,
+                                            }));
+                                        } else {
+                                            message.warning(resp?.message || 'No se pudo actualizar');
+                                        }
+                                    } catch (err) {
+                                        const status = err?.response?.status;
+                                        if (status === 404) {
+                                            setIsCorrectedSupported(false);
+                                            message.warning('El backend aún no soporta "Corregida".');
+                                        } else {
+                                            message.error(err?.response?.data?.message || err.message || 'No se pudo conectar');
+                                        }
+                                    } finally {
+                                        setIsSavingCorrected(false);
+                                    }
+                                }}
+                            >
+                                Corregida
                             </Checkbox>
                         </div>
                     </Card>
