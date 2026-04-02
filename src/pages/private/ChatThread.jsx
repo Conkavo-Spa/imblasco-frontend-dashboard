@@ -4,6 +4,7 @@ import { Badge, Button, Card, Checkbox, Empty, Input, List, Modal, Tag, message 
 import { ArrowLeftOutlined, EditOutlined, MessageOutlined } from '@ant-design/icons';
 import Sidebar from '../../components/Sidebar';
 import Conversations from '../../services/Conversations';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Asegurar limpieza de máscaras de modales al desmontar
 import { useEffect } from 'react';
@@ -55,6 +56,7 @@ const ChatThread = () => {
     const [isGoodAnswerSupported, setIsGoodAnswerSupported] = useState(true);
     const [isSavingCorrected, setIsSavingCorrected] = useState(false);
     const [isCorrectedSupported, setIsCorrectedSupported] = useState(true);
+    const queryClient = useQueryClient();
 
     // Si salimos de esta vista con un modal abierto, destruirlo para que no quede la máscara
     useEffect(() => {
@@ -158,6 +160,7 @@ const ChatThread = () => {
                                                 summary: { ...(prev?.summary || {}), hasGoodAnswer: next },
                                                 isGoodAnswer: next,
                                             }));
+                                            queryClient.invalidateQueries({ queryKey: ['conversations'] });
                                         } else {
                                             message.warning(resp?.message || 'No se pudo actualizar');
                                         }
@@ -191,6 +194,7 @@ const ChatThread = () => {
                                                 summary: { ...(prev?.summary || {}), isCorrected: next },
                                                 isCorrected: next,
                                             }));
+                                            queryClient.invalidateQueries({ queryKey: ['conversations'] });
                                         } else {
                                             message.warning(resp?.message || 'No se pudo actualizar');
                                         }
