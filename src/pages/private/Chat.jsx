@@ -286,32 +286,20 @@ const Chat = () => {
             width: 160,
             ellipsis: true,
             render: (_, record) => {
-                // Datos de cliente enviados por backend
-                const customer =
-                    record?.participants?.customer ||
-                    {}; // posible ubicación enviada por backend
-                const customerName =
-                    customer?.name ||
-                    record?.summary?.customerName ||
-                    null;
-                const customerEmail =
-                    customer?.email ||
-                    record?.summary?.customerEmail ||
-                    null;
-
-                const identified = customerName || customerEmail;
-                if (identified) return identified;
-
-                // Regla solicitada: solo para el usuario cesar, mostrar IP si no hay datos
+                // Solo mostrar identificación para cesar.barahona@conkavo.cl
                 try {
                     const raw = localStorage.getItem('user');
                     const user = raw ? JSON.parse(raw) : null;
                     if (user?.email === 'cesar.barahona@conkavo.cl') {
+                        const customer = record?.participants?.customer || {};
+                        const customerName = customer?.name || record?.summary?.customerName || null;
+                        const customerEmail = customer?.email || record?.summary?.customerEmail || null;
+                        const identified = customerName || customerEmail;
+                        if (identified) return identified;
                         return record?.summary?.lastSeenIp || String(record?._id || 'No identificado');
                     }
                 } catch (_) { /* ignore */ }
-
-                return 'No identificado';
+                return '—';
             },
         },
         {
