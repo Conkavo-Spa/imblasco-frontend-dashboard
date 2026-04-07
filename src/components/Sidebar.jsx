@@ -43,12 +43,12 @@ const Sidebar = () => {
         }
     };
 
-    // Solo cesar.barahona@conkavo.cl puede ver Mails habilitado
+    // Solo usuarios autorizados pueden ver Mails habilitado
     const isCesar = (() => {
         try {
             const raw = localStorage.getItem('user');
             const u = raw ? JSON.parse(raw) : null;
-            return u?.email === 'cesar.barahona@conkavo.cl';
+            return u?.email === 'cesar.barahona@conkavo.cl' || u?.email === 'diego@imblasco.cl';
         } catch (_) {
             return false;
         }
