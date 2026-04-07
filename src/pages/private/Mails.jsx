@@ -211,7 +211,7 @@ const Mails = () => {
             key: 'subject',
             width: 200,
             ellipsis: true,
-            render: (val) => val || '—',
+            render: (val) => <span style={{ fontSize: 9 }}>{val || '—'}</span>,
         },
         {
             title: <span className="whitespace-nowrap">Cliente</span>,
