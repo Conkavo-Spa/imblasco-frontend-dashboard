@@ -107,29 +107,14 @@ const MailFeedbackDots = ({ record }) => {
     if (!hasFeedback && !hasPrueba && !hasGoodAnswer) return null;
     const fbTxt = getLatestMailFeedbackText(record);
     const fbTitle = fbTxt ? `Feedback: ${fbTxt}` : 'Este mail tiene feedback';
+    const dot = (color) => (
+        <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: color, flexShrink: 0 }} />
+    );
     return (
-        <span className="inline-flex items-center gap-1 leading-none">
-            {hasFeedback ? (
-                <Tooltip title={fbTitle}>
-                    <span className="inline-flex leading-none">
-                        <Badge className="im-feedback-dot" dot color="#faad14" />
-                    </span>
-                </Tooltip>
-            ) : null}
-            {hasGoodAnswer ? (
-                <Tooltip title="Bien respondido">
-                    <span className="inline-flex leading-none">
-                        <Badge className="im-feedback-dot" dot color="#52c41a" />
-                    </span>
-                </Tooltip>
-            ) : null}
-            {hasPrueba ? (
-                <Tooltip title="Mail de prueba">
-                    <span className="inline-flex leading-none">
-                        <Badge className="im-feedback-dot" dot color="#1677ff" />
-                    </span>
-                </Tooltip>
-            ) : null}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 52, justifyContent: 'flex-end' }}>
+            {hasFeedback ? <Tooltip title={fbTitle}>{dot('#faad14')}</Tooltip> : null}
+            {hasGoodAnswer ? <Tooltip title="Bien respondido">{dot('#52c41a')}</Tooltip> : null}
+            {hasPrueba ? <Tooltip title="Mail de prueba">{dot('#000000')}</Tooltip> : null}
         </span>
     );
 };
@@ -209,8 +194,12 @@ const Mails = () => {
             title: <span className="whitespace-nowrap">Asunto</span>,
             dataIndex: 'subject',
             key: 'subject',
-            ellipsis: true,
-            render: (val) => val || '—',
+            width: 160,
+            render: (val) => (
+                <span style={{ fontSize: 11, lineHeight: '1.4', display: 'block', wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                    {val || '—'}
+                </span>
+            ),
         },
         {
             title: <span className="whitespace-nowrap">Cliente</span>,
