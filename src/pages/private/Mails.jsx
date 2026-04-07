@@ -209,6 +209,7 @@ const Mails = () => {
             title: <span className="whitespace-nowrap">Asunto</span>,
             dataIndex: 'subject',
             key: 'subject',
+            width: 200,
             ellipsis: true,
             render: (val) => val || '—',
         },
