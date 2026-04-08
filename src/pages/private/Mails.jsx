@@ -275,15 +275,27 @@ const Mails = () => {
         {
             title: <span className="whitespace-nowrap">Status</span>,
             key: 'status_marks',
-            width: 60,
+            width: 70,
             align: 'center',
             render: (_, record) => {
                 const isGood = record?.isGoodAnswer === true || record?.summary?.hasGoodAnswer === true;
-                if (!isGood) return null;
+                const hasFeedback = hasMailFeedback(record);
+                const fbTxt = hasFeedback ? getLatestMailFeedbackText(record) : '';
+                const fbTitle = fbTxt ? `Feedback: "${fbTxt}"` : 'Este mail tiene feedback';
+                if (!isGood && !hasFeedback) return null;
                 return (
-                    <Tooltip title="Bien respondido">
-                        <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: '#52c41a' }} />
-                    </Tooltip>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        {hasFeedback ? (
+                            <Tooltip title={fbTitle}>
+                                <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: '#fa8c16' }} />
+                            </Tooltip>
+                        ) : null}
+                        {isGood ? (
+                            <Tooltip title="Bien respondido">
+                                <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: '#52c41a' }} />
+                            </Tooltip>
+                        ) : null}
+                    </span>
                 );
             },
         },
