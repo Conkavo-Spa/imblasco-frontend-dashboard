@@ -281,6 +281,21 @@ const Mails = () => {
             },
         },
         {
+            title: <span className="whitespace-nowrap">Status</span>,
+            key: 'status_marks',
+            width: 60,
+            align: 'center',
+            render: (_, record) => {
+                const isGood = record?.isGoodAnswer === true || record?.summary?.hasGoodAnswer === true;
+                if (!isGood) return null;
+                return (
+                    <Tooltip title="Bien respondido">
+                        <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: '#52c41a' }} />
+                    </Tooltip>
+                );
+            },
+        },
+        {
             title: <span className="whitespace-nowrap">Detalle</span>,
             key: 'actions',
             width: isCesar ? 170 : 120,
