@@ -279,10 +279,11 @@ const Mails = () => {
             align: 'center',
             render: (_, record) => {
                 const isGood = record?.isGoodAnswer === true || record?.summary?.hasGoodAnswer === true;
+                const isCorrected = record?.isCorrected === true || record?.summary?.isCorrected === true;
                 const hasFeedback = hasMailFeedback(record);
                 const fbTxt = hasFeedback ? getLatestMailFeedbackText(record) : '';
                 const fbTitle = fbTxt ? `Feedback: "${fbTxt}"` : 'Este mail tiene feedback';
-                if (!isGood && !hasFeedback) return null;
+                if (!isGood && !isCorrected && !hasFeedback) return null;
                 return (
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         {hasFeedback ? (
@@ -293,6 +294,11 @@ const Mails = () => {
                         {isGood ? (
                             <Tooltip title="Bien respondido">
                                 <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: '#52c41a' }} />
+                            </Tooltip>
+                        ) : null}
+                        {isCorrected ? (
+                            <Tooltip title="Corregido">
+                                <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: '#722ed1' }} />
                             </Tooltip>
                         ) : null}
                     </span>

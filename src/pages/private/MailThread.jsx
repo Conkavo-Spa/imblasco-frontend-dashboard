@@ -27,6 +27,8 @@ const MailThread = () => {
     const [isSavingFeedback, setIsSavingFeedback] = useState(false);
     const [isSavingGoodAnswer, setIsSavingGoodAnswer] = useState(false);
     const [isGoodAnswerDisabled, setIsGoodAnswerDisabled] = useState(false);
+    const [isSavingCorrected, setIsSavingCorrected] = useState(false);
+    const [isCorrectedDisabled, setIsCorrectedDisabled] = useState(false);
 
     // Limpiar modales al desmontar
     useEffect(() => {
@@ -168,19 +170,71 @@ const MailThread = () => {
                             {' · '}
                             No leídos: <b>{conversation.summary?.unreadCount ?? 0}</b>
                         </div>
-                        <div className="mt-4">
-                            <Checkbox
-                                checked={conversation.isGoodAnswer === true || conversation.summary?.hasGoodAnswer === true}
-                                onChange={handleGoodAnswerChange}
-                                disabled={isSavingGoodAnswer || isGoodAnswerDisabled}
-                            >
-                                Bien respondido
-                            </Checkbox>
-                            {isGoodAnswerDisabled ? (
-                                <Tooltip title="Tu backend aún no soporta 'Bien respondido' para mails o hubo un error.">
-                                    <InfoCircleOutlined style={{ marginLeft: 8, color: 'rgba(0,0,0,.45)' }} />
-                                </Tooltip>
-                            ) : null}
+                        <div className="mt-4 flex flex-col gap-2">
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    checked={conversation.isGoodAnswer === true || conversation.summary?.hasGoodAnswer === true}
+                                    onChange={handleGoodAnswerChange}
+                                    disabled={isSavingGoodAnswer || isGoodAnswerDisabled}
+                                >
+                                    Bien respondido
+                                </Checkbox>
+                                {isGoodAnswerDisabled ? (
+                                    <Tooltip title="Tu backend aún no soporta 'Bien respondido' para mails o hubo un error.">
+                                        <InfoCircleOutlined style={{ color: 'rgba(0,0,0,.45)' }} />
+                                    </Tooltip>
+                                ) : null}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    checked={conversation.isCorrected === true || conversation.summary?.isCorrected === true}
+                                    onChange={async (e) => {
+                                        const next = e.target.checked;
+                                        setConversation((prev) => ({
+                                            ...prev,
+                                            isCorrected: next,
+                                            summary: { ...(prev?.summary || {}), isCorrected: next },
+                                        }));
+                                        setIsSavingCorrected(true);
+                                        try {
+                                            const resp = await EmailConversations.setConversationCorrected(conversation._id, next);
+                                            const ok = resp?.data?.success ?? resp?.success;
+                                            if (ok) {
+                                                message.success(resp?.data?.message || resp?.message || 'Actualizado');
+                                            } else {
+                                                message.warning(resp?.data?.message || resp?.message || 'No se pudo guardar');
+                                                setConversation((prev) => ({
+                                                    ...prev,
+                                                    isCorrected: !next,
+                                                    summary: { ...(prev?.summary || {}), isCorrected: !next },
+                                                }));
+                                            }
+                                        } catch (err) {
+                                            if (err?.response?.status === 404) {
+                                                message.warning('El backend aún no soporta "Corregido" para mails.');
+                                                setIsCorrectedDisabled(true);
+                                            } else {
+                                                message.error(err?.response?.data?.message || err.message || 'Error al guardar');
+                                            }
+                                            setConversation((prev) => ({
+                                                ...prev,
+                                                isCorrected: !next,
+                                                summary: { ...(prev?.summary || {}), isCorrected: !next },
+                                            }));
+                                        } finally {
+                                            setIsSavingCorrected(false);
+                                        }
+                                    }}
+                                    disabled={isSavingCorrected || isCorrectedDisabled}
+                                >
+                                    Corregido
+                                </Checkbox>
+                                {isCorrectedDisabled ? (
+                                    <Tooltip title="Tu backend aún no soporta 'Corregido' para mails o hubo un error.">
+                                        <InfoCircleOutlined style={{ color: 'rgba(0,0,0,.45)' }} />
+                                    </Tooltip>
+                                ) : null}
+                            </div>
                         </div>
                     </Card>
 

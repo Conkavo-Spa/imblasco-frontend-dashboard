@@ -14,6 +14,9 @@ class EmailConversationsService {
 
     setConversationGoodAnswer = (conversationId, isGood) =>
         instance.put(`/emails/${conversationId}/good-answer`, { isGood: isGood === true });
+
+    setConversationCorrected = (conversationId, isCorrected) =>
+        instance.put(`/emails/${conversationId}/corrected`, { isCorrected: isCorrected === true });
 }
 
 const EmailConversations = new EmailConversationsService();
