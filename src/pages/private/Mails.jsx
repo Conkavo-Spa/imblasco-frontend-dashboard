@@ -103,8 +103,7 @@ const hasMailGoodAnswer = (record) =>
 const MailFeedbackDots = ({ record }) => {
     const hasFeedback = hasMailFeedback(record);
     const hasPrueba = hasPruebaMail(record);
-    const hasGoodAnswer = hasMailGoodAnswer(record);
-    if (!hasFeedback && !hasPrueba && !hasGoodAnswer) return null;
+    if (!hasFeedback && !hasPrueba) return null;
     const fbTxt = getLatestMailFeedbackText(record);
     const fbTitle = fbTxt ? `Feedback: ${fbTxt}` : 'Este mail tiene feedback';
     return (
@@ -113,13 +112,6 @@ const MailFeedbackDots = ({ record }) => {
                 <Tooltip title={fbTitle}>
                     <span className="inline-flex leading-none">
                         <Badge className="im-feedback-dot" dot color="#faad14" />
-                    </span>
-                </Tooltip>
-            ) : null}
-            {hasGoodAnswer ? (
-                <Tooltip title="Bien respondido">
-                    <span className="inline-flex leading-none">
-                        <Badge className="im-feedback-dot" dot color="#52c41a" />
                     </span>
                 </Tooltip>
             ) : null}
