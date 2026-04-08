@@ -312,7 +312,6 @@ const Mails = () => {
             align: 'center',
             render: (_, record) => (
                 <div className="flex items-center justify-center gap-2 leading-none">
-                    <MailFeedbackDots record={record} />
                     <Button
                         type="primary"
                         size="small"
@@ -487,7 +486,6 @@ const Mails = () => {
                                                     <b>Estado:</b> {humanizeDict(THREAD_STATES, conv.estado ?? conv.status?.state)}
                                                 </p>
                                                 <div className="mt-3 flex items-center gap-2">
-                                                    <MailFeedbackDots record={conv} />
                                                     <Button
                                                         type="primary"
                                                         size="small"
