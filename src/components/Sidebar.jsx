@@ -9,6 +9,7 @@ import {
     MessageOutlined,
     SettingOutlined,
     LogoutOutlined,
+    FileSearchOutlined,
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
@@ -29,6 +30,7 @@ const Sidebar = () => {
         const path = location.pathname || '';
         if (path === '/mails' || path.startsWith('/mails/')) return ['2'];
         if (path === '/chat' || path.startsWith('/chat/')) return ['3'];
+        if (path === '/conciliaciones') return ['4'];
         return ['3'];
     };
 
@@ -68,11 +70,11 @@ const Sidebar = () => {
 
             {/* Sidebar móvil */}
             <div
-                className={`fixed top-0 left-0 h-full w-64 bg-[#370776] z-40 transition-transform duration-300 shadow-2xl ${
+                className={`fixed top-0 left-0 h-full w-64 bg-[#370776] z-40 transition-transform duration-300 shadow-2xl flex flex-col lg:hidden ${
                     collapsed ? '-translate-x-full' : 'translate-x-0'
-                } lg:hidden`}
+                }`}
             >
-                <div className="flex flex-col items-center justify-center p-6">
+                <div className="flex flex-col items-center justify-center p-6 shrink-0">
                     <div className="h-16 w-16 rounded-full overflow-hidden bg-white/95 shadow-[0_18px_40px_rgba(0,0,0,0.25)] ring-4 ring-white/15">
                         <img src={imblascoLogo} alt="Imblasco" className="h-full w-full object-cover" />
                     </div>
@@ -83,6 +85,7 @@ const Sidebar = () => {
                     mode="inline"
                     selectedKeys={getSelectedKey()}
                     onClick={() => setCollapsed(true)}
+                    className="flex-1 min-h-0 overflow-y-auto border-none!"
                     style={{ background: '#370776' }}
                 >
                     {/*
@@ -102,6 +105,9 @@ const Sidebar = () => {
                     <Menu.Item key="3" icon={<MessageOutlined />}>
                         <Link to="/chat">Chat</Link>
                     </Menu.Item>
+                    <Menu.Item key="4" icon={<FileSearchOutlined />}>
+                        <Link to="/conciliaciones">Conciliaciones</Link>
+                    </Menu.Item>
                     {/*
                     <Menu.Item key="4" icon={<ExperimentOutlined />}>
                         <Link to="/fine-tuning">Fine tuning</Link>
@@ -121,7 +127,7 @@ const Sidebar = () => {
                         Cerrar sesión
                     </Menu.Item>
                 </Menu>
-                <div className="text-center text-xs text-white/55 p-3 absolute bottom-0 w-full">
+                <div className="text-center text-xs text-white/55 p-3 shrink-0 border-t border-white/10">
                     © 2020 Lian X
                 </div>
             </div>
@@ -132,16 +138,23 @@ const Sidebar = () => {
                 breakpoint="lg"
                 collapsedWidth="0"
                 width={250}
-                className="hidden lg:block h-screen"
+                className="hidden lg:block h-screen overflow-hidden"
                 style={{ background: '#370776' }}
             >
-                <div className="flex flex-col items-center justify-center p-6">
+                <div className="flex flex-col h-full min-h-0">
+                <div className="flex flex-col items-center justify-center p-6 shrink-0">
                     <div className="h-16 w-16 rounded-full overflow-hidden bg-white/95 shadow-[0_18px_40px_rgba(0,0,0,0.25)] ring-4 ring-white/15">
                         <img src={imblascoLogo} alt="Imblasco" className="h-full w-full object-cover" />
                     </div>
                     <div className="text-sm text-white/80">Bienvenido, <span className="text-[#5DD62C] font-semibold">{getUserName()}</span></div>
                 </div>
-                <Menu theme="dark" mode="inline" selectedKeys={getSelectedKey()} style={{ background: '#370776' }}>
+                <Menu
+                    theme="dark"
+                    mode="inline"
+                    selectedKeys={getSelectedKey()}
+                    className="flex-1 min-h-0 overflow-y-auto border-none!"
+                    style={{ background: '#370776' }}
+                >
                     {/*
                     <Menu.Item key="1" icon={<LineChartOutlined />}>
                         <Link to="/dashboard">Dashboard</Link>
@@ -159,6 +172,9 @@ const Sidebar = () => {
                     <Menu.Item key="3" icon={<MessageOutlined />}>
                         <Link to="/chat">Chat</Link>
                     </Menu.Item>
+                    <Menu.Item key="4" icon={<FileSearchOutlined />}>
+                        <Link to="/conciliaciones">Conciliaciones</Link>
+                    </Menu.Item>
                     {/*
                     <Menu.Item key="4" icon={<ExperimentOutlined />}>
                         <Link to="/fine-tuning">Fine tuning</Link>
@@ -178,8 +194,9 @@ const Sidebar = () => {
                         Cerrar sesión
                     </Menu.Item>
                 </Menu>
-                <div className="text-center text-xs text-white/55 p-3 absolute bottom-0 w-full">
+                <div className="text-center text-xs text-white/55 p-3 shrink-0 border-t border-white/10">
                     © 2020 Lian X
+                </div>
                 </div>
             </Sider>
         </>
