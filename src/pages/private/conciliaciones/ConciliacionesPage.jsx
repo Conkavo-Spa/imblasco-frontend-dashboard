@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import Sidebar from '../../../components/Sidebar';
-import { Card, Table, Modal, Descriptions } from 'antd';
+import { Card, Table, Modal, Descriptions, Row, Col } from 'antd';
 import { COTIZACIONES_SEED } from '../../../data/cotizacionesSeed';
 import { useConciliationQuoteCheck } from '../../../hooks/useConciliationQuoteCheck';
 import { buildConciliacionesTableColumns } from './buildTableColumns';
@@ -17,6 +17,11 @@ export default function ConciliacionesPage() {
     const detalle = detalleCotizacionId
         ? movimientoPorCotizacion[detalleCotizacionId]
         : null;
+
+    const cotizacionRow = useMemo(
+        () => COTIZACIONES_SEED.find((c) => c.id === detalleCotizacionId) ?? null,
+        [detalleCotizacionId]
+    );
 
     const columns = useMemo(
         () =>
@@ -38,6 +43,33 @@ export default function ConciliacionesPage() {
         if (Number.isNaN(d.getTime())) return '—';
         return d.toLocaleString('es-CL');
     };
+
+    const formatCotizacionContable = (fechaYmd) => {
+        if (!fechaYmd) return '—';
+        const d = new Date(`${fechaYmd}T12:00:00`);
+        if (Number.isNaN(d.getTime())) return fechaYmd;
+        return d.toLocaleString('es-CL', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+        });
+    };
+
+    const formatCotizacionTransaccionEsperada = (fechaYmd, hora) => {
+        if (!fechaYmd) return '—';
+        if (!hora) return formatCotizacionContable(fechaYmd);
+        const [hh, mm] = String(hora).split(':').map((x) => Number.parseInt(x, 10));
+        const h = Number.isFinite(hh) ? hh : 0;
+        const m = Number.isFinite(mm) ? mm : 0;
+        const d = new Date(
+            `${fechaYmd}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`
+        );
+        if (Number.isNaN(d.getTime())) return '—';
+        return d.toLocaleString('es-CL');
+    };
+
+    const dash = (v) =>
+        v != null && String(v).trim() !== '' ? String(v).trim() : '—';
 
     return (
         <div className="flex h-screen bg-[#f6f2ff] overflow-hidden">
@@ -72,55 +104,119 @@ export default function ConciliacionesPage() {
                 </Card>
             </div>
             <Modal
-                title={`Detalle transferencia${detalleCotizacionId ? ` · ${detalleCotizacionId}` : ''}`}
+                title={`Conciliación${detalleCotizacionId ? ` · ${detalleCotizacionId}` : ''}`}
                 open={!!detalleCotizacionId}
                 onCancel={() => setDetalleCotizacionId(null)}
                 footer={null}
+                width={880}
+                styles={{ body: { paddingTop: 12 } }}
             >
-                {detalle ? (
-                    <Descriptions size="small" column={1} bordered>
-                        <Descriptions.Item label="ID movimiento">
-                            {detalle.id || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Monto">
-                            {typeof detalle.amount === 'number'
-                                ? `${formatCLP(detalle.amount)} ${detalle.currency || ''}`.trim()
-                                : '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Fecha contable">
-                            {formatDateTime(detalle.post_date)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Fecha/hora transacción">
-                            {formatDateTime(detalle.transaction_date)}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Nombre">
-                            {sourceAccount?.holder_name || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="RUT">
-                            {sourceAccount?.holder_id || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Cuenta">
-                            {sourceAccount?.number || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Banco">
-                            {sourceAccount?.institution_name || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Tipo">
-                            {detalle.type || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Descripción">
-                            {detalle.description || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Comentario">
-                            {detalle.comment || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Referencia">
-                            {detalle.reference_id || '—'}
-                        </Descriptions.Item>
-                        <Descriptions.Item label="Documento">
-                            {detalle.document_number || '—'}
-                        </Descriptions.Item>
-                    </Descriptions>
+                {detalle && cotizacionRow ? (
+                    <Row gutter={[24, 24]}>
+                        <Col xs={24} md={12}>
+                            <h3 className="text-sm font-bold text-[#370776] mb-3 border-b border-[#370776]/15 pb-2">
+                                Datos cotización
+                            </h3>
+                            <Descriptions size="small" column={1} bordered>
+                                <Descriptions.Item label="ID cotización">
+                                    {dash(cotizacionRow.id)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Monto">
+                                    {typeof cotizacionRow.monto === 'number'
+                                        ? `${formatCLP(cotizacionRow.monto)} ${cotizacionRow.moneda || 'CLP'}`.trim()
+                                        : '—'}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Fecha contable">
+                                    {formatCotizacionContable(cotizacionRow.fecha)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Fecha/hora transacción">
+                                    {formatCotizacionTransaccionEsperada(
+                                        cotizacionRow.fecha,
+                                        cotizacionRow.hora
+                                    )}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Nombre">
+                                    {dash(cotizacionRow.nombre)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="RUT">
+                                    {dash(cotizacionRow.rut)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Cuenta">
+                                    {dash(cotizacionRow.cuenta)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Banco">
+                                    {dash(cotizacionRow.banco)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Tipo">
+                                    {dash(cotizacionRow.tipo)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Descripción">
+                                    {dash(cotizacionRow.descripcion)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Comentario">
+                                    {dash(cotizacionRow.comentario)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Referencia">
+                                    {dash(cotizacionRow.referencia)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Documento">
+                                    {dash(cotizacionRow.documento)}
+                                </Descriptions.Item>
+                            </Descriptions>
+                        </Col>
+                        <Col
+                            xs={24}
+                            md={12}
+                            className="md:border-l md:border-[#370776]/15 md:pl-6"
+                        >
+                            <h3 className="text-sm font-bold text-[#370776] mb-3 border-b border-[#370776]/15 pb-2">
+                                Datos banco
+                            </h3>
+                            <Descriptions size="small" column={1} bordered>
+                                    <Descriptions.Item label="ID movimiento">
+                                        {detalle.id || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Monto">
+                                        {typeof detalle.amount === 'number'
+                                            ? `${formatCLP(detalle.amount)} ${detalle.currency || ''}`.trim()
+                                            : '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Fecha contable">
+                                        {formatDateTime(detalle.post_date)}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Fecha/hora transacción">
+                                        {formatDateTime(detalle.transaction_date)}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Nombre">
+                                        {sourceAccount?.holder_name || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="RUT">
+                                        {sourceAccount?.holder_id || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Cuenta">
+                                        {sourceAccount?.number || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Banco">
+                                        {sourceAccount?.institution_name || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Tipo">
+                                        {detalle.type || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Descripción">
+                                        {detalle.description || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Comentario">
+                                        {detalle.comment || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Referencia">
+                                        {detalle.reference_id || '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Documento">
+                                        {detalle.document_number || '—'}
+                                    </Descriptions.Item>
+                                </Descriptions>
+                        </Col>
+                    </Row>
                 ) : null}
             </Modal>
         </div>
