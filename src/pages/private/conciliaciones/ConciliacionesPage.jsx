@@ -121,6 +121,9 @@ export default function ConciliacionesPage() {
                                 <Descriptions.Item label="ID cotización">
                                     {dash(cotizacionRow.id)}
                                 </Descriptions.Item>
+                                <Descriptions.Item label="Cliente">
+                                    {dash(cotizacionRow.cliente)}
+                                </Descriptions.Item>
                                 <Descriptions.Item label="Monto">
                                     {typeof cotizacionRow.monto === 'number'
                                         ? `${formatCLP(cotizacionRow.monto)} ${cotizacionRow.moneda || 'CLP'}`.trim()
@@ -135,16 +138,16 @@ export default function ConciliacionesPage() {
                                         cotizacionRow.hora
                                     )}
                                 </Descriptions.Item>
-                                <Descriptions.Item label="Nombre">
+                                <Descriptions.Item label="Titular transferencia">
                                     {dash(cotizacionRow.nombre)}
                                 </Descriptions.Item>
-                                <Descriptions.Item label="RUT">
+                                <Descriptions.Item label="RUT titular">
                                     {dash(cotizacionRow.rut)}
                                 </Descriptions.Item>
-                                <Descriptions.Item label="Cuenta">
+                                <Descriptions.Item label="Cuenta titular">
                                     {dash(cotizacionRow.cuenta)}
                                 </Descriptions.Item>
-                                <Descriptions.Item label="Banco">
+                                <Descriptions.Item label="Banco titular">
                                     {dash(cotizacionRow.banco)}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Tipo">
@@ -187,16 +190,16 @@ export default function ConciliacionesPage() {
                                     <Descriptions.Item label="Fecha/hora transacción">
                                         {formatDateTime(detalle.transaction_date)}
                                     </Descriptions.Item>
-                                    <Descriptions.Item label="Nombre">
+                                    <Descriptions.Item label="Titular transferencia">
                                         {sourceAccount?.holder_name || '—'}
                                     </Descriptions.Item>
-                                    <Descriptions.Item label="RUT">
+                                    <Descriptions.Item label="RUT titular">
                                         {sourceAccount?.holder_id || '—'}
                                     </Descriptions.Item>
-                                    <Descriptions.Item label="Cuenta">
+                                    <Descriptions.Item label="Cuenta titular">
                                         {sourceAccount?.number || '—'}
                                     </Descriptions.Item>
-                                    <Descriptions.Item label="Banco">
+                                    <Descriptions.Item label="Banco titular">
                                         {sourceAccount?.institution_name || '—'}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Tipo">
