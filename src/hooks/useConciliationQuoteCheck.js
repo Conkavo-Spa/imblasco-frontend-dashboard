@@ -14,10 +14,18 @@ export function useConciliationQuoteCheck() {
     /** @type {[Record<string, object>, function]} */
     const [movimientoPorCotizacion, setMovimientoPorCotizacion] = useState({});
 
-    const checkQuote = useCallback(async (cotizacionId) => {
+    /**
+     * @param {{ id: string, fecha: string, monto: number, hora?: string }} record
+     */
+    const checkQuote = useCallback(async (record) => {
+        const cotizacionId = record.id;
         try {
             setCheckingId(cotizacionId);
-            const res = await conciliationApi.getQuotePaymentStatus(cotizacionId);
+            const res = await conciliationApi.getQuotePaymentStatus(cotizacionId, {
+                fecha: record.fecha,
+                monto: record.monto,
+                hora: record.hora,
+            });
             if (res.data?.pagada) {
                 setEstadoPorCotizacion((prev) => ({
                     ...prev,

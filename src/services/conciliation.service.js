@@ -7,11 +7,13 @@ import instance from '../apis/app';
 class ConciliationService {
     /**
      * @param {string} cotizacionId - ej. COT-001
-     * @returns {Promise<{ success: boolean, code: string, message: string, data?: object }>}
+     * @param {{ fecha: string, monto: number, hora?: string }} payload - fecha YYYY-MM-DD
      */
-    getQuotePaymentStatus(cotizacionId) {
+    getQuotePaymentStatus(cotizacionId, payload) {
+        const { fecha, monto, hora } = payload;
         return instance.get(
-            `/conciliations/cotizaciones/${encodeURIComponent(cotizacionId)}/payment-status`
+            `/conciliations/cotizaciones/${encodeURIComponent(cotizacionId)}/payment-status`,
+            { params: { fecha, monto, hora: hora ?? '' } }
         );
     }
 }

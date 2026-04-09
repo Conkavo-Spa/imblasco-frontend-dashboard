@@ -8,7 +8,7 @@ import { formatCLP } from '../../../utils/formatCLP';
  * @param {string | null} opts.checkingId
  * @param {Record<string, 'pendiente' | 'conciliada' | 'sin_match'>} opts.estadoPorCotizacion
  * @param {Record<string, object>} opts.movimientoPorCotizacion
- * @param {(id: string) => void} opts.onRevisar
+ * @param {(record: { id: string, fecha: string, monto: number, hora?: string }) => void} opts.onRevisar
  * @param {(id: string) => void} opts.onVerDetalle
  */
 export function buildConciliacionesTableColumns({
@@ -85,7 +85,7 @@ export function buildConciliacionesTableColumns({
                         loading={checkingId === record.id}
                         disabled={checkingId !== null && checkingId !== record.id}
                         className="bg-[#5DD62C]! hover:bg-[#49c61d]! border-none! text-[#061b00]!"
-                        onClick={() => onRevisar(record.id)}
+                        onClick={() => onRevisar(record)}
                     >
                         Revisar
                     </Button>
