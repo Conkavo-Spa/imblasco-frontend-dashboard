@@ -19,7 +19,19 @@ export function buildConciliacionesTableColumns({
     onVerDetalle,
 }) {
     return [
-        { title: 'ID cotización', dataIndex: 'id', key: 'id', width: 120 },
+        {
+            title: 'ID cotización',
+            key: 'id',
+            width: 200,
+            render: (_, record) => (
+                <div className="leading-tight">
+                    <div>{record.id}</div>
+                    {record.cliente ? (
+                        <div className="font-bold text-gray-900 mt-0.5">{record.cliente}</div>
+                    ) : null}
+                </div>
+            ),
+        },
         {
             title: 'Estado',
             key: 'estado',

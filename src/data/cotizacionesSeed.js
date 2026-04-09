@@ -1,10 +1,12 @@
 /**
  * Cotizaciones de prueba alineadas a transferencias sandbox Fintoc (mismo monto/fecha
  * y datos de depositante para comparar en el modal). Revisar envía id, fecha, monto, hora.
+ * cliente: nombre mostrado bajo el id en la tabla (cotización / cliente).
  */
 export const COTIZACIONES_SEED = [
     {
         id: 'COT-001',
+        cliente: 'César Barahona',
         fecha: '2026-04-03',
         hora: '11:00',
         monto: 1498051,
@@ -21,6 +23,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-002',
+        cliente: 'Impresiones Imp',
         fecha: '2026-04-02',
         hora: '14:22',
         monto: 7296892,
@@ -37,6 +40,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-003',
+        cliente: 'Distribuidora Norte SpA',
         fecha: '2026-04-02',
         hora: '16:05',
         monto: 8403398,
@@ -53,6 +57,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-004',
+        cliente: 'Comercial Los Andes Ltda.',
         fecha: '2026-04-01',
         hora: '10:00',
         monto: 7605351,
@@ -69,6 +74,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-005',
+        cliente: 'María Pérez Soto',
         fecha: '2026-04-01',
         hora: '11:30',
         monto: 9566921,
@@ -85,6 +91,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-006',
+        cliente: 'TecnoParts Chile',
         fecha: '2026-04-01',
         hora: '15:45',
         monto: 9941413,
@@ -101,6 +108,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-007',
+        cliente: 'Constructora Horizonte',
         fecha: '2026-04-01',
         hora: '17:10',
         monto: 5714974,
@@ -117,6 +125,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-008',
+        cliente: 'Farmacia Central',
         fecha: '2026-03-31',
         hora: '09:45',
         monto: 6340926,
@@ -133,6 +142,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-009',
+        cliente: 'Patricio Muñoz Rojas',
         fecha: '2026-03-31',
         hora: '12:30',
         monto: 5776227,
@@ -149,6 +159,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-010',
+        cliente: 'Logística Express',
         fecha: '2026-03-31',
         hora: '14:50',
         monto: 5170854,
@@ -165,6 +176,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-011',
+        cliente: 'Clínica Santa María',
         fecha: '2026-03-31',
         hora: '16:15',
         monto: 2981815,
@@ -181,6 +193,7 @@ export const COTIZACIONES_SEED = [
     },
     {
         id: 'COT-012',
+        cliente: 'Inversiones del Sur',
         fecha: '2026-03-30',
         hora: '13:20',
         monto: 9769062,
