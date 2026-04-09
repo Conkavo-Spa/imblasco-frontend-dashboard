@@ -7,12 +7,16 @@ import { formatCLP } from '../../../utils/formatCLP';
  * @param {object} opts
  * @param {string | null} opts.checkingId
  * @param {Record<string, 'pendiente' | 'conciliada' | 'sin_match'>} opts.estadoPorCotizacion
+ * @param {Record<string, object>} opts.movimientoPorCotizacion
  * @param {(id: string) => void} opts.onRevisar
+ * @param {(id: string) => void} opts.onVerDetalle
  */
 export function buildConciliacionesTableColumns({
     checkingId,
     estadoPorCotizacion,
+    movimientoPorCotizacion,
     onRevisar,
+    onVerDetalle,
 }) {
     return [
         { title: 'ID cotización', dataIndex: 'id', key: 'id', width: 120 },
@@ -47,21 +51,31 @@ export function buildConciliacionesTableColumns({
         {
             title: '',
             key: 'acciones',
-            width: 140,
+            width: 210,
             fixed: 'right',
             render: (_, record) => {
                 const e = estadoPorCotizacion[record.id] || 'pendiente';
+                const hasMov = !!movimientoPorCotizacion[record.id];
                 if (e === 'conciliada') {
                     return (
-                        <Button
-                            type="text"
-                            size="small"
-                            disabled
-                            className="text-[#237804]! cursor-default!"
-                            icon={<CheckCircleOutlined />}
-                        >
-                            Validada
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                type="text"
+                                size="small"
+                                disabled
+                                className="text-[#237804]! cursor-default!"
+                                icon={<CheckCircleOutlined />}
+                            >
+                                Validada
+                            </Button>
+                            <Button
+                                size="small"
+                                disabled={!hasMov}
+                                onClick={() => onVerDetalle(record.id)}
+                            >
+                                Ver detalle
+                            </Button>
+                        </div>
                     );
                 }
                 return (

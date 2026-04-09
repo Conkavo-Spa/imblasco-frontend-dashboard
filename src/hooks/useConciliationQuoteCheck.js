@@ -11,6 +11,8 @@ export function useConciliationQuoteCheck() {
     const [checkingId, setCheckingId] = useState(null);
     /** @type {[Record<string, EstadoRevisionCotizacion>, function]} */
     const [estadoPorCotizacion, setEstadoPorCotizacion] = useState({});
+    /** @type {[Record<string, object>, function]} */
+    const [movimientoPorCotizacion, setMovimientoPorCotizacion] = useState({});
 
     const checkQuote = useCallback(async (cotizacionId) => {
         try {
@@ -21,6 +23,12 @@ export function useConciliationQuoteCheck() {
                     ...prev,
                     [cotizacionId]: 'conciliada',
                 }));
+                if (res.data?.movimiento) {
+                    setMovimientoPorCotizacion((prev) => ({
+                        ...prev,
+                        [cotizacionId]: res.data.movimiento,
+                    }));
+                }
                 message.success(
                     res.message || 'Cotización conciliada con un movimiento bancario.'
                 );
@@ -29,6 +37,11 @@ export function useConciliationQuoteCheck() {
                     ...prev,
                     [cotizacionId]: 'sin_match',
                 }));
+                setMovimientoPorCotizacion((prev) => {
+                    const next = { ...prev };
+                    delete next[cotizacionId];
+                    return next;
+                });
                 message.warning(res.message || 'No se encontró pago coincidente.');
             }
         } catch (err) {
@@ -46,6 +59,7 @@ export function useConciliationQuoteCheck() {
     return {
         checkingId,
         estadoPorCotizacion,
+        movimientoPorCotizacion,
         checkQuote,
     };
 }
