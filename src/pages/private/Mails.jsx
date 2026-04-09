@@ -40,7 +40,7 @@ const THREAD_STATES = {
     CONSULTA_PENDIENTE: 'Pendiente Imblasco',
     LISTO_PARA_COTIZAR: 'Cotizable',
     PENDIENTE_DATOS_CLIENTE: 'Pendiente datos cliente',
-    RESUELTO: 'Resuelto',
+    RESUELTO: 'Respondido',
     ERROR: 'Error.',
 };
 
