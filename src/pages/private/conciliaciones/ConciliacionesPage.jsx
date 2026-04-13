@@ -226,11 +226,6 @@ export default function ConciliacionesPage() {
                         }}
                         size="middle"
                         scroll={{ x: 'max-content' }}
-                        rowClassName={(record) =>
-                            record.cotizacion
-                                ? 'bg-emerald-50/90 hover:bg-emerald-50!'
-                                : 'bg-amber-50/80 hover:bg-amber-50!'
-                        }
                     />
                 </Card>
             </div>

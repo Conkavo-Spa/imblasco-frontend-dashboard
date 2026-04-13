@@ -19,13 +19,6 @@ function formatContable(postDate) {
     });
 }
 
-function formatTxDateTime(value) {
-    if (!value) return '—';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('es-CL');
-}
-
 /**
  * @param {object} opts
  * @param {(row: object) => void} opts.onVerDetalle
@@ -59,12 +52,6 @@ export function buildTransferenciasTableColumns({
             key: 'post_date',
             width: 120,
             render: (_, r) => formatContable(r.post_date),
-        },
-        {
-            title: 'Fecha transacción',
-            key: 'transaction_date',
-            width: 160,
-            render: (_, r) => formatTxDateTime(r.transaction_date),
         },
         {
             title: 'Monto',
