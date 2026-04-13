@@ -1,10 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import Sidebar from '../../../components/Sidebar';
-import { Card, Table, Modal, Descriptions, Row, Col } from 'antd';
+import { Card, Table, Modal, Descriptions, Row, Col, message } from 'antd';
 import dayjs from 'dayjs';
 import { COTIZACIONES_SEED } from '../../../data/cotizacionesSeed';
 import { useConciliationTransfers } from '../../../hooks/useConciliationTransfers';
 import { matchMovementToSeed } from '../../../lib/conciliation/matchMovementToSeed';
+import { reconcileMovementAgainstSeeds } from '../../../lib/conciliation/reconcileMovementAgainstSeeds';
+import { mergeMovementCounterparty } from '../../../lib/conciliation/mergeMovementCounterparty';
 import {
     getDefaultTransferDateRange,
     DEFAULT_TRANSFER_LOOKBACK_DAYS,
@@ -37,21 +39,32 @@ export default function ConciliacionesPage() {
     const [bancoFiltro, setBancoFiltro] = useState(null);
 
     const [detalleRow, setDetalleRow] = useState(null);
+    /** Vínculo tras botón Conciliar (validación vía API / Fintoc) */
+    const [cotizacionManualPorMovimientoId, setCotizacionManualPorMovimientoId] =
+        useState({});
+    const [conciliandoId, setConciliandoId] = useState(null);
 
     const enrichedRows = useMemo(() => {
         return movements.map((m) => {
-            const acc = m.sender_account || m.recipient_account || null;
-            const cotizacion = matchMovementToSeed(m, COTIZACIONES_SEED);
+            const porSeed = matchMovementToSeed(m, COTIZACIONES_SEED);
+            const cotizacion =
+                porSeed ?? cotizacionManualPorMovimientoId[m.id] ?? null;
+            const counterparty = mergeMovementCounterparty(
+                m.sender_account,
+                m.recipient_account
+            );
             return {
                 ...m,
                 cotizacion,
-                counterpartyName: acc?.holder_name ?? null,
-                counterpartyRut: acc?.holder_id ?? null,
-                counterpartyBank: acc?.institution_name ?? null,
-                counterpartyAccount: acc?.number ?? null,
+                counterparty,
+                // Tabla = solo datos del movimiento (Fintoc). La cotización es otra columna / modal.
+                counterpartyName: counterparty?.holder_name ?? null,
+                counterpartyRut: counterparty?.holder_id ?? null,
+                counterpartyBank: counterparty?.institution_name ?? null,
+                counterpartyAccount: counterparty?.number ?? null,
             };
         });
-    }, [movements]);
+    }, [movements, cotizacionManualPorMovimientoId]);
 
     const bancoOptions = useMemo(() => {
         const set = new Set();
@@ -71,12 +84,48 @@ export default function ConciliacionesPage() {
         });
     }, [enrichedRows, estadoFiltro, searchText, minMonto, maxMonto, bancoFiltro]);
 
+    const handleConciliar = useCallback(async (record) => {
+        const mid = record.id;
+        if (!mid) return;
+        setConciliandoId(mid);
+        try {
+            const found = await reconcileMovementAgainstSeeds(
+                record,
+                COTIZACIONES_SEED
+            );
+            if (found) {
+                setCotizacionManualPorMovimientoId((prev) => ({
+                    ...prev,
+                    [mid]: found,
+                }));
+                message.success(
+                    `Conciliado con cotización ${found.id} (validado en banco).`
+                );
+            } else {
+                message.warning(
+                    'No se encontró cotización que cierre con este movimiento en Fintoc.'
+                );
+            }
+        } catch (err) {
+            const body = err.response?.data;
+            message.error(
+                body?.message ||
+                    err.message ||
+                    'Error al conciliar. Intente de nuevo.'
+            );
+        } finally {
+            setConciliandoId(null);
+        }
+    }, []);
+
     const columns = useMemo(
         () =>
             buildTransferenciasTableColumns({
                 onVerDetalle: setDetalleRow,
+                onConciliar: handleConciliar,
+                conciliandoId,
             }),
-        []
+        [handleConciliar, conciliandoId]
     );
 
     const handleDateRangeChange = (dates) => {
@@ -87,8 +136,12 @@ export default function ConciliacionesPage() {
 
     const detalle = detalleRow;
     const cotizacionRow = detalle?.cotizacion ?? null;
-    const sourceAccount =
-        detalle?.sender_account || detalle?.recipient_account || null;
+    const sourceAccount = detalle
+        ? mergeMovementCounterparty(
+              detalle.sender_account,
+              detalle.recipient_account
+          )
+        : null;
 
     const formatDateTime = (value) => {
         if (!value) return '—';

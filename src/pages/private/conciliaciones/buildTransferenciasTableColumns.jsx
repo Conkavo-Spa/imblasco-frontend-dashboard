@@ -29,8 +29,14 @@ function formatTxDateTime(value) {
 /**
  * @param {object} opts
  * @param {(row: object) => void} opts.onVerDetalle
+ * @param {(row: object) => void} [opts.onConciliar]
+ * @param {string | null} [opts.conciliandoId]
  */
-export function buildTransferenciasTableColumns({ onVerDetalle }) {
+export function buildTransferenciasTableColumns({
+    onVerDetalle,
+    onConciliar,
+    conciliandoId,
+}) {
     return [
         {
             title: 'Estado',
@@ -130,12 +136,28 @@ export function buildTransferenciasTableColumns({ onVerDetalle }) {
         {
             title: '',
             key: 'acciones',
-            width: 120,
+            width: 220,
             fixed: 'right',
             render: (_, record) => (
-                <Button size="small" onClick={() => onVerDetalle(record)}>
-                    Ver detalle
-                </Button>
+                <div className="flex flex-wrap items-center gap-2 justify-end">
+                    {!record.cotizacion && onConciliar ? (
+                        <Button
+                            type="primary"
+                            size="small"
+                            className="bg-[#5DD62C]! hover:bg-[#49c61d]! border-none! text-[#061b00]!"
+                            loading={conciliandoId === record.id}
+                            disabled={
+                                conciliandoId !== null && conciliandoId !== record.id
+                            }
+                            onClick={() => onConciliar(record)}
+                        >
+                            Conciliar
+                        </Button>
+                    ) : null}
+                    <Button size="small" onClick={() => onVerDetalle(record)}>
+                        Ver detalle
+                    </Button>
+                </div>
             ),
         },
     ];
