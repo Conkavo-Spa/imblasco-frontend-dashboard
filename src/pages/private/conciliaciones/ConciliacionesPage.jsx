@@ -1,41 +1,94 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import Sidebar from '../../../components/Sidebar';
 import { Card, Table, Modal, Descriptions, Row, Col } from 'antd';
+import dayjs from 'dayjs';
 import { COTIZACIONES_SEED } from '../../../data/cotizacionesSeed';
-import { useConciliationQuoteCheck } from '../../../hooks/useConciliationQuoteCheck';
-import { buildConciliacionesTableColumns } from './buildTableColumns';
+import { useConciliationTransfers } from '../../../hooks/useConciliationTransfers';
+import { matchMovementToSeed } from '../../../lib/conciliation/matchMovementToSeed';
+import {
+    getDefaultTransferDateRange,
+    DEFAULT_TRANSFER_LOOKBACK_DAYS,
+} from '../../../lib/conciliation/defaultTransferDateRange';
+import { filterTransferenciaRows } from '../../../lib/conciliation/filterTransferenciaRows';
+import { buildTransferenciasTableColumns } from './buildTransferenciasTableColumns';
+import ConciliacionesFilters from './ConciliacionesFilters';
 import { formatCLP } from '../../../utils/formatCLP';
 
 /**
- * Pantalla: conciliación de cotizaciones contra movimientos bancarios (Fintoc).
+ * Pantalla: transferencias bancarias (Fintoc) con validación contra cotizaciones seed.
  */
 export default function ConciliacionesPage() {
-    const [detalleCotizacionId, setDetalleCotizacionId] = React.useState(null);
-    const { checkingId, estadoPorCotizacion, movimientoPorCotizacion, checkQuote } =
-        useConciliationQuoteCheck();
+    const initialRange = useMemo(() => getDefaultTransferDateRange(), []);
 
-    const detalle = detalleCotizacionId
-        ? movimientoPorCotizacion[detalleCotizacionId]
-        : null;
+    const [dateRange, setDateRange] = useState(() => [
+        dayjs(initialRange.since),
+        dayjs(initialRange.until),
+    ]);
 
-    const cotizacionRow = useMemo(
-        () => COTIZACIONES_SEED.find((c) => c.id === detalleCotizacionId) ?? null,
-        [detalleCotizacionId]
+    const { movements, loading, setRange, refetch } = useConciliationTransfers(
+        initialRange.since,
+        initialRange.until
     );
+
+    const [estadoFiltro, setEstadoFiltro] = useState('all');
+    const [searchText, setSearchText] = useState('');
+    const [minMonto, setMinMonto] = useState(null);
+    const [maxMonto, setMaxMonto] = useState(null);
+    const [bancoFiltro, setBancoFiltro] = useState(null);
+
+    const [detalleRow, setDetalleRow] = useState(null);
+
+    const enrichedRows = useMemo(() => {
+        return movements.map((m) => {
+            const acc = m.sender_account || m.recipient_account || null;
+            const cotizacion = matchMovementToSeed(m, COTIZACIONES_SEED);
+            return {
+                ...m,
+                cotizacion,
+                counterpartyName: acc?.holder_name ?? null,
+                counterpartyRut: acc?.holder_id ?? null,
+                counterpartyBank: acc?.institution_name ?? null,
+                counterpartyAccount: acc?.number ?? null,
+            };
+        });
+    }, [movements]);
+
+    const bancoOptions = useMemo(() => {
+        const set = new Set();
+        for (const r of enrichedRows) {
+            if (r.counterpartyBank) set.add(r.counterpartyBank);
+        }
+        return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+    }, [enrichedRows]);
+
+    const filteredRows = useMemo(() => {
+        return filterTransferenciaRows(enrichedRows, {
+            estado: estadoFiltro,
+            search: searchText,
+            minMonto,
+            maxMonto,
+            banco: bancoFiltro,
+        });
+    }, [enrichedRows, estadoFiltro, searchText, minMonto, maxMonto, bancoFiltro]);
 
     const columns = useMemo(
         () =>
-            buildConciliacionesTableColumns({
-                checkingId,
-                estadoPorCotizacion,
-                movimientoPorCotizacion,
-                onRevisar: checkQuote,
-                onVerDetalle: setDetalleCotizacionId,
+            buildTransferenciasTableColumns({
+                onVerDetalle: setDetalleRow,
             }),
-        [checkingId, estadoPorCotizacion, movimientoPorCotizacion, checkQuote]
+        []
     );
 
-    const sourceAccount = detalle?.sender_account || detalle?.recipient_account || null;
+    const handleDateRangeChange = (dates) => {
+        if (!dates?.[0] || !dates?.[1]) return;
+        setDateRange(dates);
+        setRange(dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD'));
+    };
+
+    const detalle = detalleRow;
+    const cotizacionRow = detalle?.cotizacion ?? null;
+    const sourceAccount =
+        detalle?.sender_account || detalle?.recipient_account || null;
 
     const formatDateTime = (value) => {
         if (!value) return '—';
@@ -80,90 +133,113 @@ export default function ConciliacionesPage() {
                         Conciliaciones
                     </h1>
                     <p className="text-gray-600 text-sm">
-                        Cotizaciones de prueba (montos y fechas alineados con
-                        movimientos sandbox Fintoc). Revise contra el banco con
-                        el botón &quot;Revisar&quot;.
+                        Por defecto se cargan las transferencias de los últimos{' '}
+                        {DEFAULT_TRANSFER_LOOKBACK_DAYS} días (todas las contrapartes /
+                        bancos del extracto). Cada fila se valida contra el catálogo seed
+                        por fecha contable y monto. Ajuste fechas y filtros según necesite.
                     </p>
                 </div>
+
+                <ConciliacionesFilters
+                    dateRange={dateRange}
+                    onDateRangeChange={handleDateRangeChange}
+                    estadoFiltro={estadoFiltro}
+                    onEstadoFiltroChange={setEstadoFiltro}
+                    searchText={searchText}
+                    onSearchChange={setSearchText}
+                    minMonto={minMonto}
+                    maxMonto={maxMonto}
+                    onMinMontoChange={setMinMonto}
+                    onMaxMontoChange={setMaxMonto}
+                    bancoFiltro={bancoFiltro}
+                    onBancoFiltroChange={setBancoFiltro}
+                    bancoOptions={bancoOptions}
+                    onRefresh={refetch}
+                    loading={loading}
+                />
+
                 <Card className="shadow-lg border border-[#370776]/10 rounded-2xl">
                     <Table
                         rowKey="id"
                         columns={columns}
-                        dataSource={COTIZACIONES_SEED}
-                        pagination={{ pageSize: 10, showSizeChanger: false }}
+                        dataSource={filteredRows}
+                        loading={loading}
+                        pagination={{
+                            pageSize: 15,
+                            showSizeChanger: true,
+                            pageSizeOptions: ['10', '15', '25', '50'],
+                            showTotal: (total) =>
+                                `${total} transferencia${total === 1 ? '' : 's'}`,
+                        }}
                         size="middle"
                         scroll={{ x: 'max-content' }}
                         rowClassName={(record) =>
-                            estadoPorCotizacion[record.id] === 'conciliada'
+                            record.cotizacion
                                 ? 'bg-emerald-50/90 hover:bg-emerald-50!'
-                                : estadoPorCotizacion[record.id] === 'sin_match'
-                                  ? 'bg-amber-50/80 hover:bg-amber-50!'
-                                  : ''
+                                : 'bg-amber-50/80 hover:bg-amber-50!'
                         }
                     />
                 </Card>
             </div>
             <Modal
-                title={`Conciliación${detalleCotizacionId ? ` · ${detalleCotizacionId}` : ''}`}
-                open={!!detalleCotizacionId}
-                onCancel={() => setDetalleCotizacionId(null)}
+                title={
+                    detalle
+                        ? `Transferencia${detalle.id ? ` · ${detalle.id}` : ''}`
+                        : 'Detalle'
+                }
+                open={!!detalle}
+                onCancel={() => setDetalleRow(null)}
                 footer={null}
                 width={880}
                 styles={{ body: { paddingTop: 12 } }}
             >
-                {detalle && cotizacionRow ? (
+                {detalle ? (
                     <Row gutter={[24, 24]}>
                         <Col xs={24} md={12}>
                             <h3 className="text-sm font-bold text-[#370776] mb-3 border-b border-[#370776]/15 pb-2">
-                                Datos cotización
+                                Datos banco
                             </h3>
                             <Descriptions size="small" column={1} bordered>
-                                <Descriptions.Item label="ID cotización">
-                                    {dash(cotizacionRow.id)}
-                                </Descriptions.Item>
-                                <Descriptions.Item label="Cliente">
-                                    {dash(cotizacionRow.cliente)}
+                                <Descriptions.Item label="ID movimiento">
+                                    {dash(detalle.id)}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Monto">
-                                    {typeof cotizacionRow.monto === 'number'
-                                        ? `${formatCLP(cotizacionRow.monto)} ${cotizacionRow.moneda || 'CLP'}`.trim()
+                                    {typeof detalle.amount === 'number'
+                                        ? `${formatCLP(detalle.amount)} ${detalle.currency || ''}`.trim()
                                         : '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Fecha contable">
-                                    {formatCotizacionContable(cotizacionRow.fecha)}
+                                    {formatDateTime(detalle.post_date)}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Fecha/hora transacción">
-                                    {formatCotizacionTransaccionEsperada(
-                                        cotizacionRow.fecha,
-                                        cotizacionRow.hora
-                                    )}
+                                    {formatDateTime(detalle.transaction_date)}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Titular transferencia">
-                                    {dash(cotizacionRow.nombre)}
+                                    {sourceAccount?.holder_name || '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="RUT titular">
-                                    {dash(cotizacionRow.rut)}
+                                    {sourceAccount?.holder_id || '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Cuenta titular">
-                                    {dash(cotizacionRow.cuenta)}
+                                    {sourceAccount?.number || '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Banco titular">
-                                    {dash(cotizacionRow.banco)}
+                                    {sourceAccount?.institution_name || '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Tipo">
-                                    {dash(cotizacionRow.tipo)}
+                                    {detalle.type || '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Descripción">
-                                    {dash(cotizacionRow.descripcion)}
+                                    {detalle.description || '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Comentario">
-                                    {dash(cotizacionRow.comentario)}
+                                    {detalle.comment || '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Referencia">
-                                    {dash(cotizacionRow.referencia)}
+                                    {detalle.reference_id || '—'}
                                 </Descriptions.Item>
                                 <Descriptions.Item label="Documento">
-                                    {dash(cotizacionRow.documento)}
+                                    {detalle.document_number || '—'}
                                 </Descriptions.Item>
                             </Descriptions>
                         </Col>
@@ -173,51 +249,66 @@ export default function ConciliacionesPage() {
                             className="md:border-l md:border-[#370776]/15 md:pl-6"
                         >
                             <h3 className="text-sm font-bold text-[#370776] mb-3 border-b border-[#370776]/15 pb-2">
-                                Datos banco
+                                Cotización (seed)
                             </h3>
-                            <Descriptions size="small" column={1} bordered>
-                                    <Descriptions.Item label="ID movimiento">
-                                        {detalle.id || '—'}
+                            {cotizacionRow ? (
+                                <Descriptions size="small" column={1} bordered>
+                                    <Descriptions.Item label="ID cotización">
+                                        {dash(cotizacionRow.id)}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Cliente">
+                                        {dash(cotizacionRow.cliente)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Monto">
-                                        {typeof detalle.amount === 'number'
-                                            ? `${formatCLP(detalle.amount)} ${detalle.currency || ''}`.trim()
+                                        {typeof cotizacionRow.monto === 'number'
+                                            ? `${formatCLP(cotizacionRow.monto)} ${cotizacionRow.moneda || 'CLP'}`.trim()
                                             : '—'}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Fecha contable">
-                                        {formatDateTime(detalle.post_date)}
+                                        {formatCotizacionContable(cotizacionRow.fecha)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Fecha/hora transacción">
-                                        {formatDateTime(detalle.transaction_date)}
+                                        {formatCotizacionTransaccionEsperada(
+                                            cotizacionRow.fecha,
+                                            cotizacionRow.hora
+                                        )}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Titular transferencia">
-                                        {sourceAccount?.holder_name || '—'}
+                                        {dash(cotizacionRow.nombre)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="RUT titular">
-                                        {sourceAccount?.holder_id || '—'}
+                                        {dash(cotizacionRow.rut)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Cuenta titular">
-                                        {sourceAccount?.number || '—'}
+                                        {dash(cotizacionRow.cuenta)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Banco titular">
-                                        {sourceAccount?.institution_name || '—'}
+                                        {dash(cotizacionRow.banco)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Tipo">
-                                        {detalle.type || '—'}
+                                        {dash(cotizacionRow.tipo)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Descripción">
-                                        {detalle.description || '—'}
+                                        {dash(cotizacionRow.descripcion)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Comentario">
-                                        {detalle.comment || '—'}
+                                        {dash(cotizacionRow.comentario)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Referencia">
-                                        {detalle.reference_id || '—'}
+                                        {dash(cotizacionRow.referencia)}
                                     </Descriptions.Item>
                                     <Descriptions.Item label="Documento">
-                                        {detalle.document_number || '—'}
+                                        {dash(cotizacionRow.documento)}
                                     </Descriptions.Item>
                                 </Descriptions>
+                            ) : (
+                                <p className="text-gray-600 text-sm leading-relaxed">
+                                    No hay cotización en el catálogo seed que coincida con esta
+                                    transferencia por{' '}
+                                    <strong>fecha contable</strong> y <strong>monto</strong>{' '}
+                                    (misma regla que el match automático en servidor).
+                                </p>
+                            )}
                         </Col>
                     </Row>
                 ) : null}

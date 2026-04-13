@@ -6,6 +6,16 @@ import instance from '../apis/app';
  */
 class ConciliationService {
     /**
+     * @param {{ since: string, until: string }} range - YYYY-MM-DD inclusive
+     */
+    listMovements(range) {
+        const { since, until } = range;
+        return instance.get('/conciliations/movements', {
+            params: { since, until },
+        });
+    }
+
+    /**
      * @param {string} cotizacionId - ej. COT-001
      * @param {{ fecha: string, monto: number, hora?: string }} payload - fecha YYYY-MM-DD
      */
