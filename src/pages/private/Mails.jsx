@@ -252,7 +252,9 @@ const Mails = () => {
             width: 110,
             ellipsis: true,
             render: (_, record) => {
-                const stRaw = record.estado || record.status?.state;
+                const stRaw = (record.estado || record.status?.state) === 'open'
+                ? 'Abierto'
+                : (record.estado || record.status?.state);
                 const st = humanizeDict(THREAD_STATES, stRaw);
                 if (!st) return '—';
                 const color =
@@ -273,7 +275,7 @@ const Mails = () => {
             },
         },
         {
-            title: <span className="whitespace-nowrap">Status</span>,
+            title: <span className="whitespace-nowrap">Obs</span>,
             key: 'status_marks',
             width: 70,
             align: 'center',
