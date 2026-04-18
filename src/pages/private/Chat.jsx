@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import Sidebar from '../../components/Sidebar';
+import PrivatePageShell from '../../components/PrivatePageShell';
 import {
     Table,
     Card,
@@ -382,9 +382,7 @@ const Chat = () => {
     ];
 
     return (
-        <div className="flex h-screen bg-[#f6f2ff] overflow-hidden">
-            <Sidebar />
-            <div ref={scrollRef} className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto overflow-x-auto pb-8">
+        <PrivatePageShell mainRef={scrollRef}>
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-extrabold text-[#370776]">Chats</h1>
                     {canDelete ? (
@@ -537,8 +535,7 @@ const Chat = () => {
                         </>
                     )}
                 </div>
-            </div>
-        </div>
+        </PrivatePageShell>
     );
 };
 

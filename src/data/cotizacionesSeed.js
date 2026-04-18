@@ -20,6 +20,12 @@ export const COTIZACIONES_SEED = [
         comentario: null,
         referencia: null,
         documento: null,
+        /** Líneas opcionales para la tarjeta de factura sugerida (UI). */
+        lineItems: [
+            { label: 'Bolígrafo promocional x500', monto: 850000 },
+            { label: 'Tote bag serigrafía x200', monto: 480000 },
+            { label: 'Libreta A5 x150', monto: 168051 },
+        ],
     },
     {
         id: 'COT-002',
@@ -37,6 +43,11 @@ export const COTIZACIONES_SEED = [
         comentario: null,
         referencia: null,
         documento: null,
+        lineItems: [
+            { label: 'Catálogo impreso x1000', monto: 4200000 },
+            { label: 'Tarjetas visita x500', monto: 896892 },
+            { label: 'Flyer A4 x2000', monto: 2200000 },
+        ],
     },
     {
         id: 'COT-003',
@@ -54,6 +65,11 @@ export const COTIZACIONES_SEED = [
         comentario: null,
         referencia: null,
         documento: null,
+        lineItems: [
+            { label: 'Pendón retráctil x100', monto: 2100000 },
+            { label: 'Camiseta corporativa x300', monto: 3900000 },
+            { label: 'Pen drive 16GB x500', monto: 2403398 },
+        ],
     },
     {
         id: 'COT-004',
@@ -71,6 +87,11 @@ export const COTIZACIONES_SEED = [
         comentario: null,
         referencia: null,
         documento: null,
+        lineItems: [
+            { label: 'Agenda ejecutiva x200', monto: 2800000 },
+            { label: 'Mouse pad x300', monto: 1500000 },
+            { label: 'Termo acero x150', monto: 3305351 },
+        ],
     },
     {
         id: 'COT-005',
@@ -88,6 +109,11 @@ export const COTIZACIONES_SEED = [
         comentario: null,
         referencia: null,
         documento: null,
+        lineItems: [
+            { label: 'Mug cerámico x400', monto: 3600000 },
+            { label: 'Llavero metálico x600', monto: 2400000 },
+            { label: 'Bolsa ecológica x500', monto: 3566921 },
+        ],
     },
     {
         id: 'COT-006',
@@ -105,6 +131,11 @@ export const COTIZACIONES_SEED = [
         comentario: null,
         referencia: null,
         documento: null,
+        lineItems: [
+            { label: 'Kit herramientas x50', monto: 5500000 },
+            { label: 'Overol corporativo x80', monto: 3200000 },
+            { label: 'Casco logo x30', monto: 1241413 },
+        ],
     },
     {
         id: 'COT-007',
