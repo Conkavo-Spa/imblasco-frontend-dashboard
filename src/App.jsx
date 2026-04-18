@@ -8,6 +8,7 @@ import Chat from './pages/private/Chat';
 import ChatThread from './pages/private/ChatThread';
 import FineTuning from './pages/private/FineTuning';
 import Ajustes from './pages/private/Ajustes';
+import Compras from './pages/private/Compras';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
           <Route path="/chat/:id" element={<ChatThread />} />
           <Route path="/fine-tuning" element={<FineTuning />} />
           <Route path="/ajustes" element={<Ajustes />} />
+          <Route path="/compras" element={<Compras />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

@@ -9,6 +9,7 @@ import {
     MessageOutlined,
     SettingOutlined,
     LogoutOutlined,
+    ShoppingOutlined,
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
@@ -29,6 +30,7 @@ const Sidebar = () => {
         const path = location.pathname || '';
         if (path === '/mails' || path.startsWith('/mails/')) return ['2'];
         if (path === '/chat' || path.startsWith('/chat/')) return ['3'];
+        if (path === '/compras') return ['5'];
         return ['2'];
     };
 
@@ -80,6 +82,9 @@ const Sidebar = () => {
                     <Menu.Item key="3" icon={<MessageOutlined />}>
                         <Link to="/chat">Chat</Link>
                     </Menu.Item>
+                    <Menu.Item key="5" icon={<ShoppingOutlined />}>
+                        <Link to="/compras">Compras</Link>
+                    </Menu.Item>
                     {/*
                     <Menu.Item key="4" icon={<ExperimentOutlined />}>
                         <Link to="/fine-tuning">Fine tuning</Link>
@@ -130,6 +135,9 @@ const Sidebar = () => {
                     </Menu.Item>
                     <Menu.Item key="3" icon={<MessageOutlined />}>
                         <Link to="/chat">Chat</Link>
+                    </Menu.Item>
+                    <Menu.Item key="5" icon={<ShoppingOutlined />}>
+                        <Link to="/compras">Compras</Link>
                     </Menu.Item>
                     {/*
                     <Menu.Item key="4" icon={<ExperimentOutlined />}>
