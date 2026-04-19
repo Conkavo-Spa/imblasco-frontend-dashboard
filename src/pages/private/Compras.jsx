@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Table, Input, Button, Drawer, Tag, Spin, Badge, Tabs, Empty, Collapse, Modal, message, Pagination } from 'antd';
+import { Table, Input, Button, Drawer, Tag, Spin, Badge, Tabs, Empty, Collapse, Modal, message, Pagination, Tooltip } from 'antd';
 import { ShoppingOutlined, CloseOutlined, DeleteOutlined, WarningOutlined, HistoryOutlined, DownloadOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import ExcelJS from 'exceljs';
 import Sidebar from '../../components/Sidebar';
@@ -172,7 +172,7 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                                 onClick={() => { setFiltroEstado(f.key); setPaginaActual(1); }}
                                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all
                                     ${active
-                                        ? 'bg-[#370776] text-white border-[#370776]'
+                                        ? 'bg-[#370776] !text-white border-[#370776]'
                                         : `bg-white border-gray-200 hover:border-[#370776] hover:text-[#370776] ${f.color ?? 'text-gray-500'}`
                                     }`}
                             >
@@ -554,7 +554,9 @@ export default function Compras() {
             title: 'Producto',
             dataIndex: 'nombre', key: 'nombre', ellipsis: true,
             render: val => (
-                <span className="text-sm font-medium text-[#121027] leading-tight">{val}</span>
+                <Tooltip title={val} placement="topLeft" mouseEnterDelay={0.5}>
+                    <span className="text-sm font-medium text-[#121027] leading-tight">{val}</span>
+                </Tooltip>
             ),
         },
         // ── Años: 2023 y 2024 son historia, 2025 es referencia, 2026 es acción
@@ -650,9 +652,9 @@ export default function Compras() {
                     {record.sugerencia > 0 && (
                         <button
                             onClick={() => handleAPedir(record.cod, record.sugerencia, record)}
-                            className="text-xs text-[#370776] hover:underline leading-none"
+                            className="text-[10px] font-semibold text-[#370776]/70 hover:text-[#370776] hover:bg-[#f0ebff] px-1.5 py-0.5 rounded transition-colors leading-none"
                         >
-                            usar sug.
+                            ↑ sug. {fmtN(record.sugerencia)}
                         </button>
                     )}
                 </div>
@@ -785,13 +787,13 @@ export default function Compras() {
                                                         onClick={() => setCategoriaSeleccionada(cat.key)}
                                                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all
                                                             ${active
-                                                                ? 'bg-[#370776] text-white border-[#370776]'
+                                                                ? 'bg-[#370776] !text-white border-[#370776]'
                                                                 : 'bg-white text-gray-500 border-gray-200 hover:border-[#370776] hover:text-[#370776]'
                                                             }`}
                                                     >
                                                         {cat.label}
                                                         {cat.key !== 'todos' && (
-                                                            <span className={`tabular-nums ${active ? 'text-white/70' : 'text-gray-400'}`}>
+                                                            <span className={`tabular-nums ${active ? '!text-white/70' : 'text-gray-400'}`}>
                                                                 {count}
                                                             </span>
                                                         )}
@@ -810,7 +812,7 @@ export default function Compras() {
                                                     pagination={{ pageSize: 50, showSizeChanger: false }}
                                                     scroll={{ x: 900 }}
                                                     onRow={() => ({ style: { cursor: 'default' } })}
-                                                    rowClassName={(record) => pedidoCods.includes(record.cod) ? 'bg-[#f0ebff] hover:bg-[#ece4ff]' : 'hover:bg-[#f6f2ff]'}
+                                                    rowClassName={(record) => pedidoCods.includes(record.cod) ? '!bg-[#e8dcff] hover:!bg-[#ddd0ff]' : 'hover:bg-[#f6f2ff]'}
                                                 />
                                             </Spin>
                                         </div>
