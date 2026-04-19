@@ -10,6 +10,7 @@ import {
     SettingOutlined,
     LogoutOutlined,
     FileSearchOutlined,
+    ShoppingOutlined,
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
@@ -31,6 +32,7 @@ const Sidebar = () => {
         if (path === '/mails' || path.startsWith('/mails/')) return ['2'];
         if (path === '/chat' || path.startsWith('/chat/')) return ['3'];
         if (path === '/conciliaciones') return ['4'];
+        if (path === '/compras') return ['5'];
         return ['3'];
     };
 
@@ -108,6 +110,9 @@ const Sidebar = () => {
                     <Menu.Item key="4" icon={<FileSearchOutlined />}>
                         <Link to="/conciliaciones">Conciliaciones</Link>
                     </Menu.Item>
+                    <Menu.Item key="5" icon={<ShoppingOutlined />}>
+                        <Link to="/compras">Compras</Link>
+                    </Menu.Item>
                     {/*
                     <Menu.Item key="4" icon={<ExperimentOutlined />}>
                         <Link to="/fine-tuning">Fine tuning</Link>
@@ -174,6 +179,9 @@ const Sidebar = () => {
                     </Menu.Item>
                     <Menu.Item key="4" icon={<FileSearchOutlined />}>
                         <Link to="/conciliaciones">Conciliaciones</Link>
+                    </Menu.Item>
+                    <Menu.Item key="5" icon={<ShoppingOutlined />}>
+                        <Link to="/compras">Compras</Link>
                     </Menu.Item>
                     {/*
                     <Menu.Item key="4" icon={<ExperimentOutlined />}>

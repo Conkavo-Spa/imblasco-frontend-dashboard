@@ -10,6 +10,7 @@ import ChatThread from './pages/private/ChatThread';
 import FineTuning from './pages/private/FineTuning';
 import Ajustes from './pages/private/Ajustes';
 import Conciliaciones from './pages/private/conciliaciones';
+import Compras from './pages/private/Compras';
 import PrivateRoute from './components/PrivateRoute';
 
 const LAST_PATH_KEY = 'app_last_private_path';
@@ -72,6 +73,7 @@ function App() {
               <Route path="/fine-tuning" element={<FineTuning />} />
               <Route path="/ajustes" element={<Ajustes />} />
               <Route path="/conciliaciones" element={<Conciliaciones />} />
+              <Route path="/compras" element={<Compras />} />
             </Route>
             <Route path="*" element={<Navigate to="/chat" replace />} />
           </Routes>
