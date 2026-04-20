@@ -158,7 +158,6 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                 <Search
                     placeholder="Buscar por producto, código o fecha..."
                     allowClear
-                    size="large"
                     style={{ flex: 1, minWidth: 220, maxWidth: 400 }}
                     value={busqueda}
                     onChange={e => { setBusqueda(e.target.value); setPaginaActual(1); }}
@@ -552,7 +551,7 @@ export default function Compras() {
         // ── Producto ──────────────────────────────────────────────────────────
         {
             title: 'Producto',
-            dataIndex: 'nombre', key: 'nombre', ellipsis: true,
+            dataIndex: 'nombre', key: 'nombre', width: 200, ellipsis: true,
             render: val => (
                 <Tooltip title={val} placement="topLeft" mouseEnterDelay={0.5}>
                     <span className="text-sm font-medium text-[#121027] leading-tight">{val}</span>
@@ -636,9 +635,9 @@ export default function Compras() {
         // ── A pedir ───────────────────────────────────────────────────────────
         {
             title: 'A pedir',
-            key: 'aPedir', width: 110, align: 'center',
+            key: 'aPedir', width: 130, align: 'center',
             render: (_, record) => (
-                <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center justify-center gap-1">
                     <input
                         type="number" min="0"
                         data-compras-qty
@@ -646,16 +645,18 @@ export default function Compras() {
                         onChange={e => handleAPedir(record.cod, e.target.value, record)}
                         onFocus={e => e.target.select()}
                         onKeyDown={handleQtyEnter}
-                        className="w-20 text-center border border-gray-300 rounded-md px-1 py-1.5 text-sm font-bold outline-none focus:border-[#370776] focus:ring-2 focus:ring-[#370776]/20 tabular-nums"
+                        className="w-16 text-center border border-gray-300 rounded-md px-1 py-0.5 text-sm font-bold outline-none focus:border-[#370776] focus:ring-2 focus:ring-[#370776]/20 tabular-nums"
                         style={{ color: '#121027' }}
                     />
                     {record.sugerencia > 0 && (
-                        <button
-                            onClick={() => handleAPedir(record.cod, record.sugerencia, record)}
-                            className="text-[10px] font-semibold text-[#370776]/70 hover:text-[#370776] hover:bg-[#f0ebff] px-1.5 py-0.5 rounded transition-colors leading-none"
-                        >
-                            ↑ sug. {fmtN(record.sugerencia)}
-                        </button>
+                        <Tooltip title={`Aplicar sugerencia: ${fmtN(record.sugerencia)}`}>
+                            <button
+                                onClick={() => handleAPedir(record.cod, record.sugerencia, record)}
+                                className="text-[10px] font-semibold text-[#370776]/60 hover:text-[#370776] hover:bg-[#f0ebff] px-1 py-0.5 rounded transition-colors leading-none shrink-0"
+                            >
+                                ↑{fmtN(record.sugerencia)}
+                            </button>
+                        </Tooltip>
                     )}
                 </div>
             ),
@@ -673,11 +674,11 @@ export default function Compras() {
         <div className="flex h-screen bg-[#f6f2ff] overflow-hidden">
             <Sidebar />
 
-            <div className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto pb-8">
+            <div className="flex-1 pt-16 px-4 lg:pt-8 lg:px-8 overflow-y-auto overflow-x-auto pb-8">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-[#121027]">Compras</h1>
+                        <h1 className="text-3xl font-extrabold text-[#370776]">Compras</h1>
                         <p className="text-sm text-gray-500 mt-0.5">
                             Productos que necesitan reposición según stock y proyección de ventas
                         </p>
@@ -687,7 +688,6 @@ export default function Compras() {
                             <div className="flex items-center gap-2">
                                 {pedidoCods.length > 0 && (
                                     <Button
-                                        size="large"
                                         icon={<CloseOutlined />}
                                         onClick={() => Modal.confirm({
                                             title: 'Limpiar pedido',
@@ -705,7 +705,6 @@ export default function Compras() {
                                     <Button
                                         type="primary"
                                         icon={<ShoppingOutlined />}
-                                        size="large"
                                         style={{ background: '#370776', borderColor: '#370776' }}
                                         onClick={() => setDrawerOpen(true)}
                                     >
@@ -736,7 +735,6 @@ export default function Compras() {
                                             <Search
                                                 placeholder="Buscar por nombre o código en todo el catálogo..."
                                                 allowClear
-                                                size="large"
                                                 style={{ flex: 1, maxWidth: 480 }}
                                                 value={searchQuery}
                                                 onChange={e => setSearchQuery(e.target.value)}
@@ -802,15 +800,17 @@ export default function Compras() {
                                             })}
                                         </div>
 
-                                        <div className="bg-white rounded-xl border border-gray-200">
+                                        <div className="overflow-x-auto">
                                             <Spin spinning={loading || searchLoading}>
                                                 <Table
                                                     dataSource={filasFiltradas}
                                                     columns={columns}
                                                     rowKey="cod"
                                                     size="small"
+                                                    bordered
+                                                    tableLayout="fixed"
                                                     pagination={{ pageSize: 50, showSizeChanger: false }}
-                                                    scroll={{ x: 900 }}
+                                                    scroll={{ x: 'max-content' }}
                                                     onRow={() => ({ style: { cursor: 'default' } })}
                                                     rowClassName={(record) => pedidoCods.includes(record.cod) ? '!bg-[#e8dcff] hover:!bg-[#ddd0ff]' : 'hover:bg-[#f6f2ff]'}
                                                 />
