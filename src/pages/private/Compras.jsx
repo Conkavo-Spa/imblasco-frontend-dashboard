@@ -79,7 +79,7 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
         let filtrados = !q ? pedidos : pedidos.filter(p =>
             p.productos.some(x =>
                 x.nombre.toLowerCase().includes(q) || x.cod.toLowerCase().includes(q)
-            ) || new Date(p.fecha).toLocaleDateString('es-CL').includes(q)
+            ) || new Date(p.createdAt ?? p.fecha).toLocaleDateString('es-CL').includes(q)
         );
         if (filtroEstado !== 'todos') {
             filtrados = filtrados.filter(p =>
@@ -202,7 +202,10 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                             label: (
                                 <div className="flex items-center gap-3 w-full min-w-0">
                                     <span className="font-semibold text-[#121027] shrink-0">
-                                        {new Date(p.fecha).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                        {new Date(p.createdAt ?? p.fecha).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                    </span>
+                                    <span className="text-xs text-gray-400 shrink-0">
+                                        {new Date(p.createdAt ?? p.fecha).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                     <span className="text-xs text-gray-400">
                                         {p.productos.length} productos · {p.totalUnidades.toLocaleString('es-CL')} uds.
