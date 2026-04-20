@@ -622,12 +622,17 @@ export default function Compras() {
         {
             title: 'Sugerencia',
             dataIndex: 'sugerencia', key: 'sugerencia', width: 108, align: 'center',
-            render: val => (
+            render: (val, record) => (
                 val > 0
                     ? (
-                        <span className="inline-flex items-center justify-center rounded-md bg-[#f0ebff] px-2.5 py-1 text-sm font-bold text-[#370776] tabular-nums min-w-[72px]">
-                            {fmtN(val)}
-                        </span>
+                        <Tooltip title="Click para aplicar sugerencia">
+                            <button
+                                onClick={() => handleAPedir(record.cod, val, record)}
+                                className="inline-flex items-center justify-center rounded-md bg-[#f0ebff] hover:bg-[#e0d4ff] px-2.5 py-1 text-sm font-bold text-[#370776] tabular-nums min-w-[72px] transition-colors cursor-pointer"
+                            >
+                                {fmtN(val)}
+                            </button>
+                        </Tooltip>
                     )
                     : <span className="text-xs text-gray-300">—</span>
             ),
@@ -635,30 +640,18 @@ export default function Compras() {
         // ── A pedir ───────────────────────────────────────────────────────────
         {
             title: 'A pedir',
-            key: 'aPedir', width: 130, align: 'center',
+            key: 'aPedir', width: 110, align: 'center',
             render: (_, record) => (
-                <div className="flex items-center justify-center gap-1">
-                    <input
-                        type="number" min="0"
-                        data-compras-qty
-                        value={aPedir[record.cod] ?? 0}
-                        onChange={e => handleAPedir(record.cod, e.target.value, record)}
-                        onFocus={e => e.target.select()}
-                        onKeyDown={handleQtyEnter}
-                        className="w-16 text-center border border-gray-300 rounded-md px-1 py-0.5 text-sm font-bold outline-none focus:border-[#370776] focus:ring-2 focus:ring-[#370776]/20 tabular-nums"
-                        style={{ color: '#121027' }}
-                    />
-                    {record.sugerencia > 0 && (
-                        <Tooltip title={`Aplicar sugerencia: ${fmtN(record.sugerencia)}`}>
-                            <button
-                                onClick={() => handleAPedir(record.cod, record.sugerencia, record)}
-                                className="text-[10px] font-semibold text-[#370776]/60 hover:text-[#370776] hover:bg-[#f0ebff] px-1 py-0.5 rounded transition-colors leading-none shrink-0"
-                            >
-                                ↑{fmtN(record.sugerencia)}
-                            </button>
-                        </Tooltip>
-                    )}
-                </div>
+                <input
+                    type="number" min="0"
+                    data-compras-qty
+                    value={aPedir[record.cod] ?? 0}
+                    onChange={e => handleAPedir(record.cod, e.target.value, record)}
+                    onFocus={e => e.target.select()}
+                    onKeyDown={handleQtyEnter}
+                    className="w-20 text-center border border-gray-300 rounded-md px-1 py-0.5 text-sm font-bold outline-none focus:border-[#370776] focus:ring-2 focus:ring-[#370776]/20 tabular-nums"
+                    style={{ color: '#121027' }}
+                />
             ),
         },
     ];
