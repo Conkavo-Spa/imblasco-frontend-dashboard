@@ -324,6 +324,8 @@ const CATEGORIAS = [
 ];
 
 
+const CY = new Date().getFullYear();
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 export default function Compras() {
@@ -561,31 +563,31 @@ export default function Compras() {
                 </Tooltip>
             ),
         },
-        // ── Años: 2023 y 2024 son historia, 2025 es referencia, 2026 es acción
+        // ── Años: cy-3 y cy-2 son historia, cy-1 es referencia, cy es acción
         {
-            title: <span className="text-gray-400 font-medium">2023</span>,
-            dataIndex: 'y2023', key: 'y2023', width: 78, align: 'right',
+            title: <span className="text-gray-400 font-medium">{CY - 3}</span>,
+            dataIndex: `y${CY - 3}`, key: `y${CY - 3}`, width: 78, align: 'right',
             render: val => (
                 <span className="text-xs text-gray-400 tabular-nums">{fmtN(val)}</span>
             ),
         },
         {
-            title: <span className="text-gray-400 font-medium">2024</span>,
-            dataIndex: 'y2024', key: 'y2024', width: 78, align: 'right',
+            title: <span className="text-gray-400 font-medium">{CY - 2}</span>,
+            dataIndex: `y${CY - 2}`, key: `y${CY - 2}`, width: 78, align: 'right',
             render: val => (
                 <span className="text-xs text-gray-400 tabular-nums">{fmtN(val)}</span>
             ),
         },
         {
-            title: <span className="text-gray-600 font-semibold">2025</span>,
-            dataIndex: 'y2025', key: 'y2025', width: 82, align: 'right',
+            title: <span className="text-gray-600 font-semibold">{CY - 1}</span>,
+            dataIndex: `y${CY - 1}`, key: `y${CY - 1}`, width: 82, align: 'right',
             render: val => (
                 <span className="text-sm font-semibold text-gray-700 tabular-nums">{fmtN(val)}</span>
             ),
         },
         {
-            title: <span className="text-[#370776] font-bold">2026</span>,
-            dataIndex: 'y2026', key: 'y2026', width: 82, align: 'right',
+            title: <span className="text-[#370776] font-bold">{CY}</span>,
+            dataIndex: `y${CY}`, key: `y${CY}`, width: 82, align: 'right',
             render: val => (
                 <span className="text-sm font-bold text-[#370776] tabular-nums">{fmtN(val)}</span>
             ),
