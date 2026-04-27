@@ -22,10 +22,7 @@ import { filterTransferenciaRows } from '../../../lib/conciliation/filterTransfe
 import { formatCLP } from '../../../utils/formatCLP';
 import { formatChileRutDisplay } from '../../../lib/conciliation/formatChileRutDisplay';
 import ConciliacionesFilters from './ConciliacionesFilters';
-import {
-    SEED_IDS_PRECONCILIADAS_DEMO,
-    BANCOS_FILTRO_DEMO,
-} from './conciliacionDemo.constants';
+import { SEED_IDS_PRECONCILIADAS_DEMO } from './conciliacionDemo.constants';
 
 function initialsFromName(name) {
     if (!name || typeof name !== 'string') return '—';
@@ -81,9 +78,7 @@ export default function ConciliacionesPage() {
     const [maxMonto, setMaxMonto] = useState(null);
     const [bancoFiltro, setBancoFiltro] = useState(null);
 
-    const [selectedCuentaTabKey, setSelectedCuentaTabKey] = useState(
-        BANCOS_FILTRO_DEMO[0]?.key ?? null
-    );
+    const [selectedCuentaTabKey, setSelectedCuentaTabKey] = useState('all');
     const [selectedMovementId, setSelectedMovementId] = useState(null);
     const [flowStep, setFlowStep] = useState(1);
     const [flashMatch, setFlashMatch] = useState(false);
@@ -123,21 +118,24 @@ export default function ConciliacionesPage() {
         });
     }, [movements, cotizacionManualPorMovimientoId]);
 
-    const cuentaTabs = useMemo(() => BANCOS_FILTRO_DEMO, []);
+    const cuentaTabs = useMemo(() => {
+        const names = [...new Set(enrichedRows.map((r) => r.bank_name).filter(Boolean))].sort();
+        const all = { key: 'all', label: 'Todos', subtitle: 'Todas las cuentas' };
+        const banks = names.map((name) => ({ key: name, label: name, subtitle: 'Cuenta Corriente' }));
+        return [all, ...banks];
+    }, [enrichedRows]);
 
     useEffect(() => {
         const valid = cuentaTabs.some((t) => t.key === selectedCuentaTabKey);
-        if (!valid && cuentaTabs.length) {
-            setSelectedCuentaTabKey(cuentaTabs[0].key);
-        }
+        if (!valid) setSelectedCuentaTabKey('all');
     }, [cuentaTabs, selectedCuentaTabKey]);
 
-    // Las tabs de banco son solo UI (demo); no enlazar a bancoFiltro: Fintoc usa otros
-    // nombres de institución y filtraría la lista vacía.
+    const scopedRows = useMemo(() => {
+        if (!selectedCuentaTabKey || selectedCuentaTabKey === 'all') return enrichedRows;
+        return enrichedRows.filter((r) => r.bank_name === selectedCuentaTabKey);
+    }, [enrichedRows, selectedCuentaTabKey]);
 
-    const scopedRows = enrichedRows;
-
-    const bancoOptions = useMemo(() => [...BANCOS_FILTRO_DEMO], []);
+    const bancoOptions = useMemo(() => cuentaTabs.filter((t) => t.key !== 'all'), [cuentaTabs]);
 
     const filteredRows = useMemo(() => {
         return filterTransferenciaRows(scopedRows, {
