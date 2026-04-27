@@ -16,8 +16,15 @@ class ConciliationService {
     }
 
     /**
-     * @param {string} cotizacionId - ej. COT-001
-     * @param {{ fecha: string, monto: number, hora?: string }} payload - fecha YYYY-MM-DD
+     * @param {{ since?: string, until?: string, page?: number, limit?: number }} params
+     */
+    listCotizaciones(params = {}) {
+        return instance.get('/conciliations/cotizaciones', { params });
+    }
+
+    /**
+     * @param {string} cotizacionId
+     * @param {{ fecha: string, monto: number, hora?: string }} payload
      */
     getQuotePaymentStatus(cotizacionId, payload) {
         const { fecha, monto, hora } = payload;

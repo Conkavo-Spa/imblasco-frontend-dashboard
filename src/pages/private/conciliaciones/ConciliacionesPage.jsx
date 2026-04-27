@@ -9,8 +9,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useMediaQuery } from 'react-responsive';
-import { COTIZACIONES_SEED } from '../../../data/cotizacionesSeed';
 import { useConciliationTransfers } from '../../../hooks/useConciliationTransfers';
+import { useCotizaciones } from '../../../hooks/useCotizaciones';
 import { matchMovementToSeed } from '../../../lib/conciliation/matchMovementToSeed';
 import { reconcileMovementAgainstSeeds } from '../../../lib/conciliation/reconcileMovementAgainstSeeds';
 import { mergeMovementCounterparty } from '../../../lib/conciliation/mergeMovementCounterparty';
@@ -72,6 +72,8 @@ export default function ConciliacionesPage() {
         initialRange.until
     );
 
+    const { cotizaciones } = useCotizaciones(initialRange.since, initialRange.until);
+
     const [estadoFiltro, setEstadoFiltro] = useState('all');
     const [searchText, setSearchText] = useState('');
     const [minMonto, setMinMonto] = useState(null);
@@ -92,7 +94,7 @@ export default function ConciliacionesPage() {
 
     const enrichedRows = useMemo(() => {
         return movements.map((m) => {
-            const porSeed = matchMovementToSeed(m, COTIZACIONES_SEED);
+            const porSeed = matchMovementToSeed(m, cotizaciones);
             const manual = cotizacionManualPorMovimientoId[m.id] ?? null;
             let cotizacion = manual;
             if (
@@ -181,7 +183,7 @@ export default function ConciliacionesPage() {
 
     const sugerenciaSeed = useMemo(() => {
         if (!selectedRow) return null;
-        return matchMovementToSeed(selectedRow, COTIZACIONES_SEED);
+        return matchMovementToSeed(selectedRow, cotizaciones);
     }, [selectedRow]);
 
     const handleSelectRow = useCallback((row) => {
@@ -196,7 +198,7 @@ export default function ConciliacionesPage() {
         setFlowStep(3);
         setConciliandoId(mid);
         try {
-            const found = await reconcileMovementAgainstSeeds(record, COTIZACIONES_SEED);
+            const found = await reconcileMovementAgainstSeeds(record, cotizaciones);
             if (found) {
                 setCotizacionManualPorMovimientoId((prev) => ({
                     ...prev,
