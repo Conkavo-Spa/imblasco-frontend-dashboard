@@ -325,7 +325,7 @@ export default function ConciliacionesPage() {
                     <p className="mb-4 text-xs text-gray-600">
                         Se cargan abonos de los últimos {DEFAULT_TRANSFER_LOOKBACK_DAYS}{' '}
                         días (rango contable: {since} — {until}). La sugerencia usa fecha
-                        contable y monto del catálogo; al conciliar se valida contra Fintoc.
+                        contable y monto de la cotización; al conciliar se valida contra Fintoc.
                     </p>
 
                     <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#A8A8A2]">
@@ -593,12 +593,12 @@ export default function ConciliacionesPage() {
                             </span>
                         </div>
 
-                        {/* Factura sugerida */}
+                        {/* Cotización sugerida */}
                         <section className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
                             <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
                                 <span className="flex items-center gap-1.5 text-[11.5px] font-bold uppercase tracking-wide text-[#1A1A18]">
                                     <FileTextOutlined />
-                                    Factura sugerida
+                                    Cotización sugerida
                                 </span>
                                 <span className="max-w-[55%] truncate text-right font-mono text-[11px] text-[#A8A8A2]">
                                     {rightTitle}
