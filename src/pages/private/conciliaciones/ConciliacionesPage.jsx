@@ -9,8 +9,8 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useMediaQuery } from 'react-responsive';
-import { COTIZACIONES_SEED } from '../../../data/cotizacionesSeed';
 import { useConciliationTransfers } from '../../../hooks/useConciliationTransfers';
+import { useCotizaciones } from '../../../hooks/useCotizaciones';
 import { matchMovementToSeed } from '../../../lib/conciliation/matchMovementToSeed';
 import { reconcileMovementAgainstSeeds } from '../../../lib/conciliation/reconcileMovementAgainstSeeds';
 import { mergeMovementCounterparty } from '../../../lib/conciliation/mergeMovementCounterparty';
@@ -22,10 +22,7 @@ import { filterTransferenciaRows } from '../../../lib/conciliation/filterTransfe
 import { formatCLP } from '../../../utils/formatCLP';
 import { formatChileRutDisplay } from '../../../lib/conciliation/formatChileRutDisplay';
 import ConciliacionesFilters from './ConciliacionesFilters';
-import {
-    SEED_IDS_PRECONCILIADAS_DEMO,
-    BANCOS_FILTRO_DEMO,
-} from './conciliacionDemo.constants';
+import { SEED_IDS_PRECONCILIADAS_DEMO } from './conciliacionDemo.constants';
 
 function initialsFromName(name) {
     if (!name || typeof name !== 'string') return '—';
@@ -75,15 +72,15 @@ export default function ConciliacionesPage() {
         initialRange.until
     );
 
+    const { cotizaciones } = useCotizaciones(initialRange.since, initialRange.until);
+
     const [estadoFiltro, setEstadoFiltro] = useState('all');
     const [searchText, setSearchText] = useState('');
     const [minMonto, setMinMonto] = useState(null);
     const [maxMonto, setMaxMonto] = useState(null);
     const [bancoFiltro, setBancoFiltro] = useState(null);
 
-    const [selectedCuentaTabKey, setSelectedCuentaTabKey] = useState(
-        BANCOS_FILTRO_DEMO[0]?.key ?? null
-    );
+    const [selectedCuentaTabKey, setSelectedCuentaTabKey] = useState('all');
     const [selectedMovementId, setSelectedMovementId] = useState(null);
     const [flowStep, setFlowStep] = useState(1);
     const [flashMatch, setFlashMatch] = useState(false);
@@ -97,7 +94,7 @@ export default function ConciliacionesPage() {
 
     const enrichedRows = useMemo(() => {
         return movements.map((m) => {
-            const porSeed = matchMovementToSeed(m, COTIZACIONES_SEED);
+            const porSeed = matchMovementToSeed(m, cotizaciones);
             const manual = cotizacionManualPorMovimientoId[m.id] ?? null;
             let cotizacion = manual;
             if (
@@ -123,21 +120,24 @@ export default function ConciliacionesPage() {
         });
     }, [movements, cotizacionManualPorMovimientoId]);
 
-    const cuentaTabs = useMemo(() => BANCOS_FILTRO_DEMO, []);
+    const cuentaTabs = useMemo(() => {
+        const names = [...new Set(enrichedRows.map((r) => r.bank_name).filter(Boolean))].sort();
+        const all = { key: 'all', label: 'Todos', subtitle: 'Todas las cuentas' };
+        const banks = names.map((name) => ({ key: name, label: name, subtitle: 'Cuenta Corriente' }));
+        return [all, ...banks];
+    }, [enrichedRows]);
 
     useEffect(() => {
         const valid = cuentaTabs.some((t) => t.key === selectedCuentaTabKey);
-        if (!valid && cuentaTabs.length) {
-            setSelectedCuentaTabKey(cuentaTabs[0].key);
-        }
+        if (!valid) setSelectedCuentaTabKey('all');
     }, [cuentaTabs, selectedCuentaTabKey]);
 
-    // Las tabs de banco son solo UI (demo); no enlazar a bancoFiltro: Fintoc usa otros
-    // nombres de institución y filtraría la lista vacía.
+    const scopedRows = useMemo(() => {
+        if (!selectedCuentaTabKey || selectedCuentaTabKey === 'all') return enrichedRows;
+        return enrichedRows.filter((r) => r.bank_name === selectedCuentaTabKey);
+    }, [enrichedRows, selectedCuentaTabKey]);
 
-    const scopedRows = enrichedRows;
-
-    const bancoOptions = useMemo(() => [...BANCOS_FILTRO_DEMO], []);
+    const bancoOptions = useMemo(() => cuentaTabs.filter((t) => t.key !== 'all'), [cuentaTabs]);
 
     const filteredRows = useMemo(() => {
         return filterTransferenciaRows(scopedRows, {
@@ -183,7 +183,7 @@ export default function ConciliacionesPage() {
 
     const sugerenciaSeed = useMemo(() => {
         if (!selectedRow) return null;
-        return matchMovementToSeed(selectedRow, COTIZACIONES_SEED);
+        return matchMovementToSeed(selectedRow, cotizaciones);
     }, [selectedRow]);
 
     const handleSelectRow = useCallback((row) => {
@@ -198,7 +198,7 @@ export default function ConciliacionesPage() {
         setFlowStep(3);
         setConciliandoId(mid);
         try {
-            const found = await reconcileMovementAgainstSeeds(record, COTIZACIONES_SEED);
+            const found = await reconcileMovementAgainstSeeds(record, cotizaciones);
             if (found) {
                 setCotizacionManualPorMovimientoId((prev) => ({
                     ...prev,
@@ -325,7 +325,7 @@ export default function ConciliacionesPage() {
                     <p className="mb-4 text-xs text-gray-600">
                         Se cargan abonos de los últimos {DEFAULT_TRANSFER_LOOKBACK_DAYS}{' '}
                         días (rango contable: {since} — {until}). La sugerencia usa fecha
-                        contable y monto del catálogo; al conciliar se valida contra Fintoc.
+                        contable y monto de la cotización; al conciliar se valida contra Fintoc.
                     </p>
 
                     <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#A8A8A2]">
@@ -593,12 +593,12 @@ export default function ConciliacionesPage() {
                             </span>
                         </div>
 
-                        {/* Factura sugerida */}
+                        {/* Cotización sugerida */}
                         <section className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
                             <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
                                 <span className="flex items-center gap-1.5 text-[11.5px] font-bold uppercase tracking-wide text-[#1A1A18]">
                                     <FileTextOutlined />
-                                    Factura sugerida
+                                    Cotización sugerida
                                 </span>
                                 <span className="max-w-[55%] truncate text-right font-mono text-[11px] text-[#A8A8A2]">
                                     {rightTitle}
