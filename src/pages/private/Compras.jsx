@@ -308,10 +308,11 @@ function fmtN(n) {
 }
 
 function getCategoria(cod) {
-    const pre = String(cod ?? '').substring(0, 3);
-    if (pre === '591') return 'trofeos';
+    const pre = String(cod ?? '').trim().substring(0, 3);
+    if (['591', '599'].includes(pre)) return 'trofeos';
     if (['601', '602', '603'].includes(pre)) return 'publicitarios';
-    if (pre === '501' || pre === '999') return 'pesca';
+    if (['501', '502', '560', '582', '586', '999'].includes(pre)) return 'pesca';
+    if (pre === '701') return 'timbres';
     return 'otros';
 }
 
@@ -320,6 +321,7 @@ const CATEGORIAS = [
     { key: 'trofeos',       label: 'Trofeos y Premios' },
     { key: 'publicitarios', label: 'Artículos Publicitarios' },
     { key: 'pesca',         label: 'Pesca' },
+    { key: 'timbres',       label: 'Timbres Automáticos' },
     { key: 'otros',         label: 'Otros' },
 ];
 
@@ -379,7 +381,7 @@ export default function Compras() {
 
     // ── Conteo por categoría (sobre la lista base, sin filtro de búsqueda) ──
     const countsPorCategoria = useMemo(() => {
-        const counts = { todos: 0, trofeos: 0, publicitarios: 0, pesca: 0, otros: 0 };
+        const counts = { todos: 0, trofeos: 0, publicitarios: 0, pesca: 0, timbres: 0, otros: 0 };
         (filas ?? []).forEach(p => {
             counts.todos++;
             const cat = getCategoria(p.cod);
@@ -467,14 +469,14 @@ export default function Compras() {
         setActualizando(true);
         try {
             await comprasApi.actualizar();
-            await refetchProductos();
-            message.success('Datos actualizados desde el ERP.');
+            await Promise.all([refetchProductos(), refetchPedidos(), refetchEmbarcados()]);
+            message.success('Pedidos embarcados marcados como recibidos.');
         } catch (err) {
-            message.error(err.response?.data?.message || 'No se pudo actualizar. Verifica que el archivo SQL esté disponible.');
+            message.error(err.response?.data?.message || 'No se pudo actualizar. Verifica la conexión con la base de datos.');
         } finally {
             setActualizando(false);
         }
-    }, [refetchProductos]);
+    }, [refetchProductos, refetchPedidos, refetchEmbarcados]);
 
     // ── Aviso al cerrar/recargar pestaña con pedido sin exportar ────────────
     useEffect(() => {
@@ -765,10 +767,10 @@ export default function Compras() {
                                                     icon={<ReloadOutlined />}
                                                     loading={actualizando}
                                                     onClick={handleActualizar}
-                                                    title="Regenerar datos desde el dump SQL del ERP"
+                                                    title="Marcar pedidos embarcados como recibidos"
                                                     size="small"
                                                 >
-                                                    Actualizar datos
+                                                    Marcar recibidos
                                                 </Button>
                                             </div>
                                         </div>
