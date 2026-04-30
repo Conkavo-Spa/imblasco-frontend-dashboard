@@ -1,13 +1,12 @@
 import dayjs from 'dayjs';
 
-/** Ventana inicial: últimos N días hasta hoy (fechas contables inclusive). */
-export const DEFAULT_TRANSFER_LOOKBACK_DAYS = 60;
+// Fecha de inicio del sistema de conciliaciones — no cambia con el tiempo
+export const CONCILIATION_START_DATE = '2026-04-29';
+export const DEFAULT_TRANSFER_LOOKBACK_DAYS = dayjs().diff(dayjs(CONCILIATION_START_DATE), 'day');
 
 export function getDefaultTransferDateRange() {
-    const until = dayjs();
-    const since = until.subtract(DEFAULT_TRANSFER_LOOKBACK_DAYS, 'day');
     return {
-        since: since.format('YYYY-MM-DD'),
-        until: until.format('YYYY-MM-DD'),
+        since: CONCILIATION_START_DATE,
+        until: dayjs().format('YYYY-MM-DD'),
     };
 }
