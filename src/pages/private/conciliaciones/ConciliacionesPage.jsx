@@ -72,7 +72,11 @@ export default function ConciliacionesPage() {
         initialRange.until
     );
 
-    const { cotizaciones } = useCotizaciones(initialRange.since, initialRange.until);
+    // Cotizaciones: rango amplio (último año) independiente del rango de movimientos.
+    // El pago llega semanas/meses después de emitir la cotización.
+    const cotizacionesSince = useMemo(() => dayjs().subtract(1, 'year').format('YYYY-MM-DD'), []);
+    const cotizacionesUntil = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
+    const { cotizaciones } = useCotizaciones(cotizacionesSince, cotizacionesUntil);
 
     const [estadoFiltro, setEstadoFiltro] = useState('all');
     const [searchText, setSearchText] = useState('');
