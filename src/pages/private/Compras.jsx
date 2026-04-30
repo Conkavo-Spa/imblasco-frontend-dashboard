@@ -307,13 +307,14 @@ function fmtN(n) {
     return (n ?? 0).toLocaleString('es-CL');
 }
 
-function getCategoria(cod) {
-    const pre = String(cod ?? '').trim().substring(0, 3);
-    if (['591', '599'].includes(pre)) return 'trofeos';
-    if (['601', '602', '603'].includes(pre)) return 'publicitarios';
-    if (['501', '502', '560', '582', '586', '999'].includes(pre)) return 'pesca';
-    if (pre === '701') return 'timbres';
-    return 'otros';
+const FAMILIA_A_CATEGORIA = {
+    'PESCA':                   'pesca',
+    'TROFEOS':                 'trofeos',
+    'ARTICULOS PUBLICITARIOS': 'publicitarios',
+    'TIMBRES':                 'timbres',
+};
+function getCategoriaDeProducto(p) {
+    return FAMILIA_A_CATEGORIA[p?.familia] ?? 'otros';
 }
 
 const CATEGORIAS = [
@@ -345,10 +346,14 @@ export default function Compras() {
     const [pedidoCods, setPedidoCods] = useState([]);
     const [pedidoInfo, setPedidoInfo] = useState({});
 
+    const initialLoadDone = useRef(false);
     useEffect(() => {
         if (rawProductos.length > 0) {
             setFilas(rawProductos);
-            setAPedir({});
+            if (!initialLoadDone.current) {
+                setAPedir({});
+                initialLoadDone.current = true;
+            }
         }
     }, [rawProductos]);
 
@@ -384,7 +389,7 @@ export default function Compras() {
         const counts = { todos: 0, trofeos: 0, publicitarios: 0, pesca: 0, timbres: 0, otros: 0 };
         (filas ?? []).forEach(p => {
             counts.todos++;
-            const cat = getCategoria(p.cod);
+            const cat = getCategoriaDeProducto(p);
             if (counts[cat] !== undefined) counts[cat]++;
         });
         return counts;
@@ -394,7 +399,7 @@ export default function Compras() {
     const filasFiltradas = useMemo(() => {
         const base = searchQuery.trim() ? searchResults : (filas ?? []);
         if (categoriaSeleccionada === 'todos') return base;
-        return base.filter(p => getCategoria(p.cod) === categoriaSeleccionada);
+        return base.filter(p => getCategoriaDeProducto(p) === categoriaSeleccionada);
     }, [searchQuery, searchResults, filas, categoriaSeleccionada]);
 
     // ── Navegar entre inputs con Enter ──────────────────────────────────────
@@ -432,7 +437,7 @@ export default function Compras() {
 
     // ── Aplicar sugerencias de la categoría activa ───────────────────────────
     const aplicarSugerenciasCategoria = useCallback(() => {
-        const fuente = filasFiltradas.filter(p => (p.sugerencia ?? 0) > 0);
+        const fuente = filasFiltradas.filter(p => (p.sugerencia ?? 0) > 0 && !p.descartado);
         if (fuente.length === 0) return;
 
         const ejecutar = () => {
@@ -558,10 +563,17 @@ export default function Compras() {
         // ── Producto ──────────────────────────────────────────────────────────
         {
             title: 'Producto',
-            dataIndex: 'nombre', key: 'nombre', width: 200, ellipsis: true,
-            render: val => (
+            dataIndex: 'nombre', key: 'nombre', width: 220,
+            render: (val, record) => (
                 <Tooltip title={val} placement="topLeft" mouseEnterDelay={0.5}>
-                    <span className="text-sm font-medium text-[#121027] leading-tight">{val}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`text-sm font-medium leading-tight truncate ${record.descartado ? 'text-gray-400' : 'text-[#121027]'}`}>{val}</span>
+                        {record.descartado && (
+                            <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', flexShrink: 0, marginInlineEnd: 0 }}>
+                                Descartado
+                            </Tag>
+                        )}
+                    </div>
                 </Tooltip>
             ),
         },
@@ -663,11 +675,19 @@ export default function Compras() {
         },
     ];
 
-    const productosConCantidad = pedidoCods.map(cod => pedidoInfo[cod]).filter(Boolean);
+    const productosConCantidad = pedidoCods.map(cod => pedidoInfo[cod]).filter(p => p && (aPedir[p.cod] ?? 0) > 0);
 
-    const statusLabel = searchQuery.trim()
-        ? { text: `${filasFiltradas.length} resultado${filasFiltradas.length !== 1 ? 's' : ''}`, sub: `para "${searchQuery.trim()}"` }
-        : { text: `${filasFiltradas.length} producto${filasFiltradas.length !== 1 ? 's' : ''} a pedir`, sub: 'según stock y proyección' };
+    const statusLabel = useMemo(() => {
+        if (searchQuery.trim()) {
+            return { text: `${filasFiltradas.length} resultado${filasFiltradas.length !== 1 ? 's' : ''}`, sub: `para "${searchQuery.trim()}"` };
+        }
+        const prioritarios = filasFiltradas.filter(p => !p.descartado).length;
+        const descartadosN = filasFiltradas.filter(p =>  p.descartado).length;
+        const sub = descartadosN > 0
+            ? `según stock y proyección · ${descartadosN} descartado${descartadosN !== 1 ? 's' : ''} al final`
+            : 'según stock y proyección';
+        return { text: `${prioritarios} producto${prioritarios !== 1 ? 's' : ''} a pedir`, sub };
+    }, [searchQuery, filasFiltradas]);
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -812,7 +832,11 @@ export default function Compras() {
                                                     pagination={{ pageSize: 50, showSizeChanger: false }}
                                                     scroll={{ x: 'max-content' }}
                                                     onRow={() => ({ style: { cursor: 'default' } })}
-                                                    rowClassName={(record) => pedidoCods.includes(record.cod) ? '!bg-[#e8dcff] hover:!bg-[#ddd0ff]' : 'hover:bg-[#f6f2ff]'}
+                                                    rowClassName={(record) => {
+                                                        if (pedidoCods.includes(record.cod)) return '!bg-[#e8dcff] hover:!bg-[#ddd0ff]';
+                                                        if (record.descartado) return '!bg-gray-50 opacity-60 hover:!opacity-100';
+                                                        return 'hover:bg-[#f6f2ff]';
+                                                    }}
                                                 />
                                             </Spin>
                                         </div>
@@ -892,7 +916,10 @@ export default function Compras() {
                             >
                                 <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                                     <span className="text-xs text-gray-400 font-semibold">{p.cod}</span>
-                                    <span className="text-sm text-[#121027] font-medium leading-tight">{p.nombre}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`text-sm font-medium leading-tight ${p.descartado ? 'text-gray-400' : 'text-[#121027]'}`}>{p.nombre}</span>
+                                        {p.descartado && <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', flexShrink: 0, marginInlineEnd: 0 }}>Descartado</Tag>}
+                                    </div>
                                 </div>
                                 <input
                                     type="number" min="0"
