@@ -307,14 +307,13 @@ function fmtN(n) {
     return (n ?? 0).toLocaleString('es-CL');
 }
 
-const FAMILIA_A_CATEGORIA = {
-    'PESCA':                   'pesca',
-    'TROFEOS':                 'trofeos',
-    'ARTICULOS PUBLICITARIOS': 'publicitarios',
-    'TIMBRES':                 'timbres',
-};
-function getCategoriaDeProducto(p) {
-    return FAMILIA_A_CATEGORIA[p?.familia] ?? 'otros';
+function getCategoria(cod) {
+    const pre = String(cod ?? '').trim().substring(0, 3);
+    if (['591', '599'].includes(pre)) return 'trofeos';
+    if (['601', '602', '603'].includes(pre)) return 'publicitarios';
+    if (['501', '502', '560', '582', '586', '999'].includes(pre)) return 'pesca';
+    if (pre === '701') return 'timbres';
+    return 'otros';
 }
 
 const CATEGORIAS = [
@@ -346,14 +345,10 @@ export default function Compras() {
     const [pedidoCods, setPedidoCods] = useState([]);
     const [pedidoInfo, setPedidoInfo] = useState({});
 
-    const initialLoadDone = useRef(false);
     useEffect(() => {
         if (rawProductos.length > 0) {
             setFilas(rawProductos);
-            if (!initialLoadDone.current) {
-                setAPedir({});
-                initialLoadDone.current = true;
-            }
+            setAPedir({});
         }
     }, [rawProductos]);
 
@@ -389,7 +384,7 @@ export default function Compras() {
         const counts = { todos: 0, trofeos: 0, publicitarios: 0, pesca: 0, timbres: 0, otros: 0 };
         (filas ?? []).forEach(p => {
             counts.todos++;
-            const cat = getCategoriaDeProducto(p);
+            const cat = getCategoria(p.cod);
             if (counts[cat] !== undefined) counts[cat]++;
         });
         return counts;
@@ -399,7 +394,7 @@ export default function Compras() {
     const filasFiltradas = useMemo(() => {
         const base = searchQuery.trim() ? searchResults : (filas ?? []);
         if (categoriaSeleccionada === 'todos') return base;
-        return base.filter(p => getCategoriaDeProducto(p) === categoriaSeleccionada);
+        return base.filter(p => getCategoria(p.cod) === categoriaSeleccionada);
     }, [searchQuery, searchResults, filas, categoriaSeleccionada]);
 
     // ── Navegar entre inputs con Enter ──────────────────────────────────────
@@ -437,7 +432,7 @@ export default function Compras() {
 
     // ── Aplicar sugerencias de la categoría activa ───────────────────────────
     const aplicarSugerenciasCategoria = useCallback(() => {
-        const fuente = filasFiltradas.filter(p => (p.sugerencia ?? 0) > 0 && !p.descartado);
+        const fuente = filasFiltradas.filter(p => (p.sugerencia ?? 0) > 0);
         if (fuente.length === 0) return;
 
         const ejecutar = () => {
@@ -470,17 +465,26 @@ export default function Compras() {
     }, [filasFiltradas, categoriaSeleccionada]);
 
     // ── Actualizar datos desde el ERP ────────────────────────────────────────
-    const handleActualizar = useCallback(async () => {
-        setActualizando(true);
-        try {
-            await comprasApi.actualizar();
-            await Promise.all([refetchProductos(), refetchPedidos(), refetchEmbarcados()]);
-            message.success('Pedidos embarcados marcados como recibidos.');
-        } catch (err) {
-            message.error(err.response?.data?.message || 'No se pudo actualizar. Verifica la conexión con la base de datos.');
-        } finally {
-            setActualizando(false);
-        }
+    const handleActualizar = useCallback(() => {
+        Modal.confirm({
+            title: '¿Marcar todos como recibidos?',
+            content: 'Esta acción marcará todos los pedidos embarcados como recibidos. No se puede deshacer.',
+            okText: 'Sí, marcar recibidos',
+            cancelText: 'Cancelar',
+            okButtonProps: { danger: true },
+            onOk: async () => {
+                setActualizando(true);
+                try {
+                    await comprasApi.actualizar();
+                    await Promise.all([refetchProductos(), refetchPedidos(), refetchEmbarcados()]);
+                    message.success('Pedidos embarcados marcados como recibidos.');
+                } catch (err) {
+                    message.error(err.response?.data?.message || 'No se pudo actualizar. Verifica la conexión con la base de datos.');
+                } finally {
+                    setActualizando(false);
+                }
+            },
+        });
     }, [refetchProductos, refetchPedidos, refetchEmbarcados]);
 
     // ── Aviso al cerrar/recargar pestaña con pedido sin exportar ────────────
@@ -563,21 +567,14 @@ export default function Compras() {
         // ── Producto ──────────────────────────────────────────────────────────
         {
             title: 'Producto',
-            dataIndex: 'nombre', key: 'nombre', width: 220,
-            render: (val, record) => (
+            dataIndex: 'nombre', key: 'nombre', width: 200, ellipsis: true,
+            render: val => (
                 <Tooltip title={val} placement="topLeft" mouseEnterDelay={0.5}>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`text-sm font-medium leading-tight truncate ${record.descartado ? 'text-gray-400' : 'text-[#121027]'}`}>{val}</span>
-                        {record.descartado && (
-                            <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', flexShrink: 0, marginInlineEnd: 0 }}>
-                                Descartado
-                            </Tag>
-                        )}
-                    </div>
+                    <span className="text-sm font-medium text-[#121027] leading-tight">{val}</span>
                 </Tooltip>
             ),
         },
-        // ── Años: CY-3 y CY-2 son historia, CY-1 es referencia, CY es acción
+        // ── Años: cy-3 y cy-2 son historia, cy-1 es referencia, cy es acción
         {
             title: <span className="text-gray-400 font-medium">{CY - 3}</span>,
             dataIndex: `y${CY - 3}`, key: `y${CY - 3}`, width: 78, align: 'right',
@@ -675,19 +672,11 @@ export default function Compras() {
         },
     ];
 
-    const productosConCantidad = pedidoCods.map(cod => pedidoInfo[cod]).filter(p => p && (aPedir[p.cod] ?? 0) > 0);
+    const productosConCantidad = pedidoCods.map(cod => pedidoInfo[cod]).filter(Boolean);
 
-    const statusLabel = useMemo(() => {
-        if (searchQuery.trim()) {
-            return { text: `${filasFiltradas.length} resultado${filasFiltradas.length !== 1 ? 's' : ''}`, sub: `para "${searchQuery.trim()}"` };
-        }
-        const prioritarios = filasFiltradas.filter(p => !p.descartado).length;
-        const descartadosN = filasFiltradas.filter(p =>  p.descartado).length;
-        const sub = descartadosN > 0
-            ? `según stock y proyección · ${descartadosN} descartado${descartadosN !== 1 ? 's' : ''} al final`
-            : 'según stock y proyección';
-        return { text: `${prioritarios} producto${prioritarios !== 1 ? 's' : ''} a pedir`, sub };
-    }, [searchQuery, filasFiltradas]);
+    const statusLabel = searchQuery.trim()
+        ? { text: `${filasFiltradas.length} resultado${filasFiltradas.length !== 1 ? 's' : ''}`, sub: `para "${searchQuery.trim()}"` }
+        : { text: `${filasFiltradas.length} producto${filasFiltradas.length !== 1 ? 's' : ''} a pedir`, sub: 'según stock y proyección' };
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -832,11 +821,7 @@ export default function Compras() {
                                                     pagination={{ pageSize: 50, showSizeChanger: false }}
                                                     scroll={{ x: 'max-content' }}
                                                     onRow={() => ({ style: { cursor: 'default' } })}
-                                                    rowClassName={(record) => {
-                                                        if (pedidoCods.includes(record.cod)) return '!bg-[#e8dcff] hover:!bg-[#ddd0ff]';
-                                                        if (record.descartado) return '!bg-gray-50 opacity-60 hover:!opacity-100';
-                                                        return 'hover:bg-[#f6f2ff]';
-                                                    }}
+                                                    rowClassName={(record) => pedidoCods.includes(record.cod) ? '!bg-[#e8dcff] hover:!bg-[#ddd0ff]' : 'hover:bg-[#f6f2ff]'}
                                                 />
                                             </Spin>
                                         </div>
@@ -916,10 +901,7 @@ export default function Compras() {
                             >
                                 <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                                     <span className="text-xs text-gray-400 font-semibold">{p.cod}</span>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className={`text-sm font-medium leading-tight ${p.descartado ? 'text-gray-400' : 'text-[#121027]'}`}>{p.nombre}</span>
-                                        {p.descartado && <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', flexShrink: 0, marginInlineEnd: 0 }}>Descartado</Tag>}
-                                    </div>
+                                    <span className="text-sm text-[#121027] font-medium leading-tight">{p.nombre}</span>
                                 </div>
                                 <input
                                     type="number" min="0"
