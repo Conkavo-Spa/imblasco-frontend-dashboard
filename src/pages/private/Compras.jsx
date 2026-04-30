@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Table, Input, Button, Drawer, Tag, Spin, Badge, Tabs, Empty, Collapse, Modal, message, Pagination, Tooltip } from 'antd';
-import { ShoppingOutlined, CloseOutlined, DeleteOutlined, WarningOutlined, HistoryOutlined, DownloadOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Input, Button, Drawer, Tag, Spin, Badge, Tabs, Empty, Collapse, Modal, message, Pagination, Tooltip, Upload } from 'antd';
+import { ShoppingOutlined, CloseOutlined, DeleteOutlined, WarningOutlined, HistoryOutlined, DownloadOutlined, CheckCircleOutlined, ReloadOutlined, InboxOutlined } from '@ant-design/icons';
 import ExcelJS from 'exceljs';
 import Sidebar from '../../components/Sidebar';
 import { useCompras } from '../../hooks/useCompras';
@@ -327,6 +327,363 @@ const CATEGORIAS = [
 
 
 const CY = new Date().getFullYear();
+
+// ── Embarques Tab ─────────────────────────────────────────────────────────────
+
+const { Dragger } = Upload;
+
+function fmtFechaEmb(d) {
+    if (!d) return '—';
+    const date = d instanceof Date ? d : new Date(d);
+    if (isNaN(date)) return '—';
+    return date.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function EmbarquesTab() {
+    const [datos, setDatos] = useState(null);
+    const [cargando, setCargando] = useState(false);
+    const [nombreArchivo, setNombreArchivo] = useState('');
+    const [vistaActiva, setVistaActiva] = useState('embarcado');
+    const [busquedaEmb, setBusquedaEmb] = useState('');
+    const [busquedaPE, setBusquedaPE] = useState('');
+    const [busquedaParc, setBusquedaParc] = useState('');
+
+    const handleFile = useCallback((file) => {
+        setCargando(true);
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const wb = new ExcelJS.Workbook();
+                await wb.xlsx.load(e.target.result);
+
+                const embSheet = wb.worksheets.find(ws => ws.name.toLowerCase() === 'embarcado');
+                const peSheet  = wb.worksheets.find(ws => ws.name.toLowerCase().replace(/\s/g, '') === 'porembarcar');
+
+                const parseSheet = (sheet) => {
+                    if (!sheet) return [];
+                    const rows = [];
+                    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+                        if (rowNumber === 1) return;
+                        const v = row.values;
+                        rows.push([v[1], v[2], v[3], v[4], v[5], v[6], v[7]]);
+                    });
+                    return rows;
+                };
+
+                const toDate = (v) => (v instanceof Date ? v : null);
+
+                const embRows = parseSheet(embSheet);
+                const peRows  = parseSheet(peSheet);
+
+                const embarcado = embRows.map(r => ({
+                    codigo:        r[0],
+                    fechaPedido:   toDate(r[1]),
+                    descripcion:   String(r[2] || '').trim(),
+                    pedido:        Number(r[3]) || 0,
+                    fechaEmbarque: toDate(r[4]),
+                    factura:       String(r[5] || 'Sin factura').trim(),
+                    embarcado:     Number(r[6]) || 0,
+                })).filter(r => r.codigo && r.descripcion);
+
+                const porEmbarcar = peRows.map(r => ({
+                    codigo:      r[0],
+                    fechaPedido: toDate(r[1]),
+                    descripcion: String(r[2] || '').trim(),
+                    pedido:      Number(r[3]) || 0,
+                })).filter(r => r.codigo && r.descripcion);
+
+                if (!embarcado.length && !porEmbarcar.length) {
+                    message.error('El archivo no tiene hojas "embarcado" ni "Por Embarcar" con datos.');
+                    setCargando(false);
+                    return;
+                }
+
+                setDatos({ embarcado, porEmbarcar });
+                setNombreArchivo(file.name);
+                message.success(`${embarcado.length} embarcados · ${porEmbarcar.length} por embarcar`);
+            } catch {
+                message.error('No se pudo leer el archivo. Verifica el formato.');
+            } finally {
+                setCargando(false);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+        return false;
+    }, []);
+
+    const gruposEmbarcado = useMemo(() => {
+        if (!datos?.embarcado) return [];
+        const map = {};
+        datos.embarcado.forEach(item => {
+            const key = item.factura;
+            if (!map[key]) map[key] = { factura: key, fechaEmbarque: item.fechaEmbarque, items: [] };
+            map[key].items.push(item);
+        });
+        return Object.values(map).sort((a, b) => {
+            if (!a.fechaEmbarque) return 1;
+            if (!b.fechaEmbarque) return -1;
+            return b.fechaEmbarque - a.fechaEmbarque;
+        });
+    }, [datos]);
+
+    const gruposFiltrados = useMemo(() => {
+        const q = busquedaEmb.trim().toLowerCase();
+        if (!q) return gruposEmbarcado;
+        return gruposEmbarcado.map(g => ({
+            ...g,
+            items: g.items.filter(i =>
+                i.descripcion.toLowerCase().includes(q) ||
+                String(i.codigo).includes(q) ||
+                g.factura.toLowerCase().includes(q)
+            ),
+        })).filter(g => g.items.length > 0);
+    }, [gruposEmbarcado, busquedaEmb]);
+
+    const porEmbarcarFiltrado = useMemo(() => {
+        if (!datos?.porEmbarcar) return [];
+        const q = busquedaPE.trim().toLowerCase();
+        const hoy = Date.now();
+        return datos.porEmbarcar
+            .filter(i => !q || i.descripcion.toLowerCase().includes(q) || String(i.codigo).includes(q))
+            .map(i => ({
+                ...i,
+                diasEspera: i.fechaPedido ? Math.round((hoy - i.fechaPedido) / 86400000) : 0,
+            }))
+            .sort((a, b) => b.diasEspera - a.diasEspera);
+    }, [datos, busquedaPE]);
+
+    const parciales = useMemo(() => {
+        if (!datos?.embarcado || !datos?.porEmbarcar) return [];
+        const historial = {};
+        datos.embarcado.forEach(item => {
+            const cod = String(item.codigo).trim();
+            if (!historial[cod]) historial[cod] = { totalRecibido: 0, ultimoEmbarque: null, nEnvios: 0 };
+            historial[cod].totalRecibido += (item.embarcado || item.pedido || 0);
+            historial[cod].nEnvios++;
+            if (item.fechaEmbarque && (!historial[cod].ultimoEmbarque || item.fechaEmbarque > historial[cod].ultimoEmbarque)) {
+                historial[cod].ultimoEmbarque = item.fechaEmbarque;
+            }
+        });
+        const hoy = Date.now();
+        return datos.porEmbarcar
+            .filter(item => historial[String(item.codigo).trim()])
+            .map(item => {
+                const h = historial[String(item.codigo).trim()];
+                return {
+                    ...item,
+                    totalRecibido: h.totalRecibido,
+                    ultimoEmbarque: h.ultimoEmbarque,
+                    nEnvios: h.nEnvios,
+                    diasEspera: item.fechaPedido ? Math.round((hoy - item.fechaPedido) / 86400000) : 0,
+                };
+            })
+            .sort((a, b) => b.diasEspera - a.diasEspera);
+    }, [datos]);
+
+    const parcialesFiltrados = useMemo(() => {
+        const q = busquedaParc.trim().toLowerCase();
+        if (!q) return parciales;
+        return parciales.filter(i => i.descripcion.toLowerCase().includes(q) || String(i.codigo).includes(q));
+    }, [parciales, busquedaParc]);
+
+    if (!datos) {
+        return (
+            <div className="flex flex-col items-center justify-center py-12 gap-5">
+                <Spin spinning={cargando}>
+                    <div className="flex flex-col items-center gap-5 w-full max-w-lg">
+                        <div className="w-16 h-16 rounded-2xl bg-[#f0ebff] flex items-center justify-center text-3xl select-none">🚢</div>
+                        <div className="text-center">
+                            <p className="text-base font-bold text-[#121027] mb-1">Seguimiento de embarques</p>
+                            <p className="text-sm text-gray-400 leading-relaxed">
+                                Sube el archivo de importaciones para ver el historial de envíos<br />
+                                y los pedidos pendientes de embarque.
+                            </p>
+                        </div>
+                        <Dragger
+                            accept=".xls,.xlsx"
+                            showUploadList={false}
+                            beforeUpload={handleFile}
+                            style={{ width: '100%', borderColor: '#370776', borderRadius: 12, background: '#faf8ff' }}
+                        >
+                            <div className="py-6 px-8 flex flex-col items-center gap-2">
+                                <InboxOutlined style={{ color: '#370776', fontSize: 30 }} />
+                                <p className="text-sm font-semibold text-[#121027]">Arrastra el archivo aquí</p>
+                                <p className="text-xs text-gray-400">o haz click para seleccionar · .xls / .xlsx</p>
+                                <div className="mt-1 flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded bg-[#f0ebff] text-[#370776] text-xs font-mono font-semibold">embarcado</span>
+                                    <span className="text-gray-300 text-xs">+</span>
+                                    <span className="px-2 py-0.5 rounded bg-[#f0ebff] text-[#370776] text-xs font-mono font-semibold">Por Embarcar</span>
+                                </div>
+                            </div>
+                        </Dragger>
+                    </div>
+                </Spin>
+            </div>
+        );
+    }
+
+    const totalEnvios = gruposEmbarcado.length;
+    const totalUdsEmb = datos.embarcado.reduce((s, i) => s + (i.embarcado || i.pedido || 0), 0);
+    const totalUdsPE  = datos.porEmbarcar.reduce((s, i) => s + i.pedido, 0);
+    const hoyTs       = Date.now();
+    const maxEspera   = datos.porEmbarcar.reduce((mx, i) => {
+        const d = i.fechaPedido ? Math.round((hoyTs - i.fechaPedido) / 86400000) : 0;
+        return d > mx ? d : mx;
+    }, 0);
+
+    return (
+        <div className="flex flex-col gap-4 pb-5">
+            <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-3 flex-wrap">
+                <span className="text-xs text-gray-400">Archivo:</span>
+                <span className="text-sm font-semibold text-[#370776] truncate max-w-xs">{nombreArchivo}</span>
+                <Upload accept=".xls,.xlsx" showUploadList={false} beforeUpload={handleFile}>
+                    <Button size="small">Cambiar archivo</Button>
+                </Upload>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+                <div className="bg-white rounded-xl border border-gray-200 px-4 py-3.5">
+                    <p className="text-xs text-gray-400 mb-1">Envíos recibidos</p>
+                    <p className="text-2xl font-extrabold text-[#370776] leading-none">{totalEnvios}</p>
+                    <p className="text-xs text-gray-400 mt-1">{datos.embarcado.length} productos · {fmtN(totalUdsEmb)} uds.</p>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 px-4 py-3.5">
+                    <p className="text-xs text-gray-400 mb-1">Por embarcar</p>
+                    <p className="text-2xl font-extrabold text-orange-500 leading-none">{datos.porEmbarcar.length}</p>
+                    <p className="text-xs text-gray-400 mt-1">{fmtN(totalUdsPE)} uds. pendientes</p>
+                </div>
+                <div className="bg-white rounded-xl border border-gray-200 px-4 py-3.5">
+                    <p className="text-xs text-gray-400 mb-1">Espera más larga</p>
+                    <p className={`text-2xl font-extrabold leading-none ${maxEspera <= 0 ? 'text-gray-300' : maxEspera <= 60 ? 'text-green-500' : maxEspera <= 120 ? 'text-yellow-500' : 'text-red-500'}`}>
+                        {maxEspera > 0 ? `${maxEspera}d` : '—'}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1">pedido sin embarcar</p>
+                </div>
+            </div>
+
+            <div className="flex gap-2 flex-wrap">
+                {[
+                    { key: 'embarcado',   label: '🚢 Embarcados',      count: datos.embarcado.length },
+                    { key: 'porEmbarcar', label: '⏳ Por embarcar',     count: datos.porEmbarcar.length },
+                    { key: 'parciales',   label: '📦 Envíos parciales', count: parciales.length },
+                ].map(v => (
+                    <button
+                        key={v.key}
+                        onClick={() => setVistaActiva(v.key)}
+                        className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold border transition-all
+                            ${vistaActiva === v.key
+                                ? 'bg-[#370776] !text-white border-[#370776]'
+                                : 'bg-white text-gray-500 border-gray-200 hover:border-[#370776] hover:text-[#370776]'}`}
+                    >
+                        {v.label}
+                        <span className={`text-xs ${vistaActiva === v.key ? '!text-white/70' : 'text-gray-400'}`}>{v.count}</span>
+                    </button>
+                ))}
+            </div>
+
+            {vistaActiva === 'embarcado' && (
+                <div className="flex flex-col gap-3">
+                    <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-4 flex-wrap">
+                        <Search placeholder="Buscar por producto, código o factura..." allowClear style={{ flex: 1, minWidth: 220, maxWidth: 400 }} value={busquedaEmb} onChange={e => setBusquedaEmb(e.target.value)} />
+                        <span className="ml-auto text-sm font-semibold text-[#121027] shrink-0">{gruposFiltrados.length} envío{gruposFiltrados.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    {gruposFiltrados.length === 0 ? <Empty description="Sin resultados." className="py-12" /> : (
+                        <Collapse expandIconPosition="end" className="bg-transparent" style={{ border: 'none' }}
+                            items={gruposFiltrados.map(g => {
+                                const totalUds = g.items.reduce((s, i) => s + (i.embarcado || i.pedido || 0), 0);
+                                return {
+                                    key: g.factura,
+                                    label: (
+                                        <div className="flex items-center gap-3 w-full min-w-0">
+                                            <span className="font-semibold text-[#121027] shrink-0">{fmtFechaEmb(g.fechaEmbarque)}</span>
+                                            <span className="font-mono text-xs font-semibold text-[#370776] shrink-0">{g.factura}</span>
+                                            <span className="text-xs text-gray-400">{g.items.length} producto{g.items.length !== 1 ? 's' : ''} · {fmtN(totalUds)} uds.</span>
+                                        </div>
+                                    ),
+                                    children: (
+                                        <Table dataSource={g.items.map((item, idx) => ({ ...item, key: idx }))} size="small" bordered pagination={false} rowKey="key"
+                                            columns={[
+                                                { title: 'Código', dataIndex: 'codigo', width: 110, render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span> },
+                                                { title: 'Descripción', dataIndex: 'descripcion', render: v => <span className="text-sm text-[#121027]">{v}</span> },
+                                                { title: 'Fecha pedido', dataIndex: 'fechaPedido', width: 130, align: 'center', render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span> },
+                                                { title: 'Cantidad', key: 'cantidad', width: 110, align: 'right', render: (_, r) => <span className="text-sm font-bold text-[#370776] tabular-nums">{fmtN(r.embarcado || r.pedido || 0)}</span> },
+                                            ]}
+                                            rowClassName={() => 'hover:bg-[#f6f2ff]'}
+                                        />
+                                    ),
+                                };
+                            })}
+                        />
+                    )}
+                </div>
+            )}
+
+            {vistaActiva === 'parciales' && (
+                <div className="flex flex-col gap-3">
+                    <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-4 flex-wrap">
+                        <Search placeholder="Buscar por producto o código..." allowClear style={{ flex: 1, minWidth: 220, maxWidth: 400 }} value={busquedaParc} onChange={e => setBusquedaParc(e.target.value)} />
+                        <span className="ml-auto text-sm font-semibold text-[#121027] shrink-0">{parcialesFiltrados.length} producto{parcialesFiltrados.length !== 1 ? 's' : ''} con envío partido</span>
+                    </div>
+                    {parcialesFiltrados.length === 0 ? <Empty description="Sin resultados." className="py-12" /> : (
+                        <div className="overflow-x-auto">
+                            <Table dataSource={parcialesFiltrados.map((item, i) => ({ ...item, key: i }))} rowKey="key" size="small" bordered tableLayout="fixed" pagination={{ pageSize: 50, showSizeChanger: false }} scroll={{ x: 'max-content' }}
+                                columns={[
+                                    { title: 'Código', dataIndex: 'codigo', width: 110, render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span> },
+                                    { title: 'Descripción', dataIndex: 'descripcion', render: v => <span className="text-sm text-[#121027]">{v}</span> },
+                                    { title: 'Último embarque', dataIndex: 'ultimoEmbarque', width: 150, align: 'center', render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span> },
+                                    { title: 'Ya recibido', dataIndex: 'totalRecibido', width: 120, align: 'right', render: v => <span className="text-sm font-bold text-green-600 tabular-nums">{fmtN(v)} uds.</span> },
+                                    { title: 'Pendiente', dataIndex: 'pedido', width: 110, align: 'right', render: v => <span className="text-sm font-bold text-orange-500 tabular-nums">{fmtN(v)} uds.</span> },
+                                    { title: 'Días esperando', dataIndex: 'diasEspera', width: 130, align: 'center', sorter: (a, b) => a.diasEspera - b.diasEspera, defaultSortOrder: 'descend',
+                                        render: v => {
+                                            if (!v) return <span className="text-gray-300">—</span>;
+                                            const cls = v > 180 ? 'bg-red-100 text-red-700' : v > 120 ? 'bg-orange-100 text-orange-700' : v > 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700';
+                                            return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cls}`}>{v}d</span>;
+                                        }
+                                    },
+                                ]}
+                                rowClassName={r => r.diasEspera > 180 ? '!bg-red-50 hover:!bg-red-100' : r.diasEspera > 120 ? '!bg-orange-50 hover:!bg-orange-100' : r.diasEspera > 60 ? '!bg-yellow-50 hover:!bg-yellow-100' : 'hover:bg-[#f6f2ff]'}
+                            />
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {vistaActiva === 'porEmbarcar' && (
+                <div className="flex flex-col gap-3">
+                    <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-4 flex-wrap">
+                        <Search placeholder="Buscar por producto o código..." allowClear style={{ flex: 1, minWidth: 220, maxWidth: 400 }} value={busquedaPE} onChange={e => setBusquedaPE(e.target.value)} />
+                        <div className="ml-auto flex items-center gap-3 shrink-0">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                                <span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-100 border border-red-200" /> +180d
+                                <span className="inline-block w-2.5 h-2.5 rounded-sm bg-orange-100 border border-orange-200 ml-1" /> +120d
+                                <span className="inline-block w-2.5 h-2.5 rounded-sm bg-yellow-100 border border-yellow-200 ml-1" /> +60d
+                            </div>
+                            <span className="text-sm font-semibold text-[#121027]">{porEmbarcarFiltrado.length} productos</span>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <Table dataSource={porEmbarcarFiltrado} rowKey={(_, i) => i} size="small" bordered tableLayout="fixed" pagination={{ pageSize: 50, showSizeChanger: false }} scroll={{ x: 'max-content' }}
+                            columns={[
+                                { title: 'Código', dataIndex: 'codigo', width: 110, render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span> },
+                                { title: 'Descripción', dataIndex: 'descripcion', render: v => <span className="text-sm text-[#121027]">{v}</span> },
+                                { title: 'Fecha pedido', dataIndex: 'fechaPedido', width: 130, align: 'center', render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span> },
+                                { title: 'Días esperando', dataIndex: 'diasEspera', width: 130, align: 'center', sorter: (a, b) => a.diasEspera - b.diasEspera, defaultSortOrder: 'descend',
+                                    render: v => {
+                                        if (!v) return <span className="text-gray-300">—</span>;
+                                        const cls = v > 180 ? 'bg-red-100 text-red-700' : v > 120 ? 'bg-orange-100 text-orange-700' : v > 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700';
+                                        return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cls}`}>{v}d</span>;
+                                    }
+                                },
+                                { title: 'Cantidad', dataIndex: 'pedido', width: 110, align: 'right', render: v => <span className="text-sm font-bold text-[#370776] tabular-nums">{fmtN(v)}</span> },
+                            ]}
+                            rowClassName={r => r.diasEspera > 180 ? '!bg-red-50 hover:!bg-red-100' : r.diasEspera > 120 ? '!bg-orange-50 hover:!bg-orange-100' : r.diasEspera > 60 ? '!bg-yellow-50 hover:!bg-yellow-100' : 'hover:bg-[#f6f2ff]'}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
@@ -843,6 +1200,11 @@ export default function Compras() {
                                         onEmbarcadoChange={() => { refetchEmbarcados(); refetchConfirmados(); refetchProductos(); }}
                                     />
                                 ),
+                            },
+                            {
+                                key: 'embarques',
+                                label: <span className="font-medium">🚢 Embarques</span>,
+                                children: <EmbarquesTab />,
                             },
                         ]}
                     />
