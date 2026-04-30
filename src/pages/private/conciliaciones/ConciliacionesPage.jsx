@@ -11,6 +11,7 @@ import dayjs from 'dayjs';
 import { useMediaQuery } from 'react-responsive';
 import { useConciliationTransfers } from '../../../hooks/useConciliationTransfers';
 import { useCotizaciones } from '../../../hooks/useCotizaciones';
+import { useConciliaciones } from '../../../hooks/useConciliaciones';
 import { matchMovementToSeed } from '../../../lib/conciliation/matchMovementToSeed';
 import { reconcileMovementAgainstSeeds } from '../../../lib/conciliation/reconcileMovementAgainstSeeds';
 import { mergeMovementCounterparty } from '../../../lib/conciliation/mergeMovementCounterparty';
@@ -78,6 +79,19 @@ export default function ConciliacionesPage() {
     const cotizacionesUntil = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
     const { cotizaciones } = useCotizaciones(cotizacionesSince, cotizacionesUntil);
 
+    const { conciliaciones, loading: loadingHistorial, refetch: refetchHistorial } = useConciliaciones();
+
+    // IDs ya conciliados para filtrar pendientes
+    const conciliadosMovementIds = useMemo(
+        () => new Set(conciliaciones.map((c) => c.movement_id)),
+        [conciliaciones]
+    );
+    const conciliadasCotizacionIds = useMemo(
+        () => new Set(conciliaciones.map((c) => String(c.cotizacion_id))),
+        [conciliaciones]
+    );
+
+    const [mainTab, setMainTab] = useState('pendientes'); // 'pendientes' | 'historial'
     const [estadoFiltro, setEstadoFiltro] = useState('all');
     const [searchText, setSearchText] = useState('');
     const [minMonto, setMinMonto] = useState(null);
@@ -97,32 +111,34 @@ export default function ConciliacionesPage() {
     const isNarrow = useMediaQuery({ maxWidth: 1100 });
 
     const enrichedRows = useMemo(() => {
-        return movements.map((m) => {
-            const porSeed = matchMovementToSeed(m, cotizaciones);
-            const manual = cotizacionManualPorMovimientoId[m.id] ?? null;
-            let cotizacion = manual;
-            if (
-                !cotizacion &&
-                porSeed &&
-                SEED_IDS_PRECONCILIADAS_DEMO.has(porSeed.id)
-            ) {
-                cotizacion = porSeed;
-            }
-            const counterparty = mergeMovementCounterparty(
-                m.sender_account,
-                m.recipient_account
-            );
-            return {
-                ...m,
-                cotizacion,
-                counterparty,
-                counterpartyName: counterparty?.holder_name ?? null,
-                counterpartyRut: counterparty?.holder_id ?? null,
-                counterpartyBank: counterparty?.institution_name ?? null,
-                counterpartyAccount: counterparty?.number ?? null,
-            };
-        });
-    }, [movements, cotizacionManualPorMovimientoId]);
+        return movements
+            .filter((m) => !conciliadosMovementIds.has(m.id))
+            .map((m) => {
+                const porSeed = matchMovementToSeed(m, cotizaciones.filter((c) => !conciliadasCotizacionIds.has(c.id)));
+                const manual = cotizacionManualPorMovimientoId[m.id] ?? null;
+                let cotizacion = manual;
+                if (
+                    !cotizacion &&
+                    porSeed &&
+                    SEED_IDS_PRECONCILIADAS_DEMO.has(porSeed.id)
+                ) {
+                    cotizacion = porSeed;
+                }
+                const counterparty = mergeMovementCounterparty(
+                    m.sender_account,
+                    m.recipient_account
+                );
+                return {
+                    ...m,
+                    cotizacion,
+                    counterparty,
+                    counterpartyName: counterparty?.holder_name ?? null,
+                    counterpartyRut: counterparty?.holder_id ?? null,
+                    counterpartyBank: counterparty?.institution_name ?? null,
+                    counterpartyAccount: counterparty?.number ?? null,
+                };
+            });
+    }, [movements, cotizacionManualPorMovimientoId, conciliadosMovementIds, conciliadasCotizacionIds, cotizaciones]);
 
     const cuentaTabs = useMemo(() => {
         const names = [...new Set(enrichedRows.map((r) => r.bank_name).filter(Boolean))].sort();
@@ -213,6 +229,7 @@ export default function ConciliacionesPage() {
                 message.success('Conciliación registrada correctamente');
                 setSelectedMovementId(null);
                 setFlowStep(1);
+                refetchHistorial();
             } else {
                 message.warning(
                     'No se encontró cotización que cierre con este movimiento en Fintoc.'
@@ -332,6 +349,110 @@ export default function ConciliacionesPage() {
                         contable y monto de la cotización; al conciliar se valida contra Fintoc.
                     </p>
 
+                    {/* Tabs principales */}
+                    <div className="mb-5 flex gap-2 border-b border-[#E4E4DF]">
+                        <button
+                            type="button"
+                            onClick={() => setMainTab('pendientes')}
+                            className={[
+                                'px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors',
+                                mainTab === 'pendientes'
+                                    ? 'border-[#1A6B3C] text-[#1A6B3C]'
+                                    : 'border-transparent text-[#6B6B65] hover:text-[#1A1A18]',
+                            ].join(' ')}
+                        >
+                            Pendientes
+                            {pendientesCount > 0 && (
+                                <span className="ml-2 rounded-full bg-[#FEF3C7] px-1.5 py-0.5 text-[10px] font-bold text-[#B45309]">
+                                    {pendientesCount}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMainTab('historial')}
+                            className={[
+                                'px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors',
+                                mainTab === 'historial'
+                                    ? 'border-[#1A6B3C] text-[#1A6B3C]'
+                                    : 'border-transparent text-[#6B6B65] hover:text-[#1A1A18]',
+                            ].join(' ')}
+                        >
+                            Historial conciliado
+                            {conciliaciones.length > 0 && (
+                                <span className="ml-2 rounded-full bg-[#DCFCE7] px-1.5 py-0.5 text-[10px] font-bold text-[#16A34A]">
+                                    {conciliaciones.length}
+                                </span>
+                            )}
+                        </button>
+                    </div>
+
+                    {mainTab === 'historial' ? (
+                        <div className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
+                            <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
+                                <span className="text-[11.5px] font-bold uppercase tracking-wide text-[#1A1A18]">
+                                    Transferencias conciliadas
+                                </span>
+                                <span className="font-mono text-[11px] text-[#A8A8A2]">
+                                    {conciliaciones.length} registros
+                                </span>
+                            </div>
+                            {loadingHistorial ? (
+                                <div className="p-8 text-center text-sm text-[#6B6B65]">Cargando historial…</div>
+                            ) : conciliaciones.length === 0 ? (
+                                <div className="p-10 text-center text-sm text-[#6B6B65]">
+                                    Aún no hay conciliaciones registradas.
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-[12px]">
+                                        <thead className="border-b border-[#E4E4DF] bg-[#FAFAF8] text-[10px] font-bold uppercase tracking-wide text-[#A8A8A2]">
+                                            <tr>
+                                                <th className="px-4 py-2">Fecha pago</th>
+                                                <th className="px-4 py-2">Banco</th>
+                                                <th className="px-4 py-2">Cotización</th>
+                                                <th className="px-4 py-2">Cliente</th>
+                                                <th className="px-4 py-2">RUT</th>
+                                                <th className="px-4 py-2 text-right">Monto</th>
+                                                <th className="px-4 py-2">Conciliado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {conciliaciones.map((c) => (
+                                                <tr key={c._id} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
+                                                    <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
+                                                        {c.fecha_movimiento ?? '—'}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-[#6B6B65]">
+                                                        {c.bank_name ?? '—'}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 font-mono font-semibold text-[#1D4ED8]">
+                                                        {c.cotizacion_id ?? '—'}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-[#1A1A18]">
+                                                        {c.cliente ?? '—'}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
+                                                        {formatChileRutDisplay(c.rut)}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-right font-mono font-semibold text-[#1A1A18]">
+                                                        {typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}
+                                                    </td>
+                                                    <td className="px-4 py-2.5 text-[#A8A8A2]">
+                                                        {c.createdAt
+                                                            ? new Date(c.createdAt).toLocaleString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })
+                                                            : '—'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    ) : null}
+
+                    {mainTab === 'pendientes' ? (<>
                     <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[#A8A8A2]">
                         Selecciona el banco a revisar
                     </div>
@@ -740,6 +861,8 @@ export default function ConciliacionesPage() {
                             </div>
                         </section>
                     </div>
+
+            </>) : null}
 
             <Modal
                 title={

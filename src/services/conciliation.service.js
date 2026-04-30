@@ -23,6 +23,17 @@ class ConciliationService {
     }
 
     /**
+     * @param {{ movement: object, cotizacion: object }} payload
+     */
+    saveConciliacion(payload) {
+        return instance.post('/conciliations/conciliar', payload);
+    }
+
+    listConciliadas(params = {}) {
+        return instance.get('/conciliations/historial', { params });
+    }
+
+    /**
      * @param {string} cotizacionId
      * @param {{ fecha: string, monto: number, hora?: string }} payload
      */
