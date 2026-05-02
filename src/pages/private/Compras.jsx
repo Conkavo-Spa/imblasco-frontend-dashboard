@@ -201,10 +201,11 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                     className="bg-transparent"
                     style={{ border: 'none' }}
                     items={pedidosPaginados.map(p => {
-                        const tieneDisputa   = p.productos.some(x => (x.estado ?? 'pendiente') === 'enDisputa');
-                        const tieneConfirm   = p.productos.some(x => (x.estado ?? 'pendiente') === 'confirmado');
-                        const tieneEmbarcado = p.productos.some(x => (x.estado ?? 'pendiente') === 'embarcado');
+                        const tieneDisputa    = p.productos.some(x => (x.estado ?? 'pendiente') === 'enDisputa');
+                        const tieneConfirm    = p.productos.some(x => (x.estado ?? 'pendiente') === 'confirmado');
+                        const tieneEmbarcado  = p.productos.some(x => (x.estado ?? 'pendiente') === 'embarcado');
                         const tieneIncompleto = p.productos.some(x => (x.estado ?? 'pendiente') === 'incompleto');
+                        const tieneRecibido   = p.productos.some(x => (x.estado ?? 'pendiente') === 'recibido');
                         return {
                             key: p._id,
                             label: (
@@ -222,6 +223,7 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                                     {tieneConfirm    && <Tag color="success">Confirmado</Tag>}
                                     {tieneEmbarcado  && <Tag color="processing">Embarcado</Tag>}
                                     {tieneIncompleto && <Tag color="orange">Incompleto</Tag>}
+                                    {tieneRecibido   && <Tag color="purple">Recibido</Tag>}
                                     <div className="ml-auto flex gap-2 shrink-0" onClick={e => e.stopPropagation()}>
                                         <Button
                                             size="small"
