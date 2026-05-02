@@ -22,6 +22,9 @@ class PedidosService {
     eliminar(id) {
         return instance.delete(`/pedidos/${id}`);
     }
+    confirmarRecibidos(items) {
+        return instance.post('/pedidos/confirmar-recibidos', { items });
+    }
 }
 
 const pedidosApi = new PedidosService();

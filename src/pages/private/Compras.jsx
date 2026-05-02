@@ -7,6 +7,7 @@ import { useCompras } from '../../hooks/useCompras';
 import { usePedidos, useEmbarcados, useConfirmados } from '../../hooks/usePedidos';
 import comprasApi from '../../services/compras.service';
 import pedidosApi from '../../services/pedidos.service';
+import * as XLSX from 'xlsx';
 
 const { Search } = Input;
 
@@ -50,10 +51,12 @@ async function exportarExcel(productos, fecha) {
 // ── Config de estados por producto ───────────────────────────────────────────
 
 const ESTADOS = {
-    pendiente:  { label: 'Pendiente',  bg: 'bg-gray-50',   border: 'border-gray-200',  text: 'text-gray-400'  },
-    enDisputa:  { label: 'En disputa', bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-600' },
-    confirmado: { label: 'X Embarcar', bg: 'bg-green-50',  border: 'border-green-300',  text: 'text-green-600'  },
-    embarcado:  { label: 'Embarcado',  bg: 'bg-blue-50',   border: 'border-blue-300',   text: 'text-blue-600'   },
+    pendiente:  { label: 'Pendiente',  bg: 'bg-gray-50',    border: 'border-gray-200',   text: 'text-gray-400'   },
+    enDisputa:  { label: 'En disputa', bg: 'bg-yellow-50',  border: 'border-yellow-300', text: 'text-yellow-600' },
+    confirmado: { label: 'X Embarcar', bg: 'bg-green-50',   border: 'border-green-300',  text: 'text-green-600'  },
+    embarcado:  { label: 'Embarcado',  bg: 'bg-blue-50',    border: 'border-blue-300',   text: 'text-blue-600'   },
+    incompleto: { label: 'Incompleto', bg: 'bg-orange-50',  border: 'border-orange-300', text: 'text-orange-600' },
+    recibido:   { label: 'Recibido',   bg: 'bg-purple-50',  border: 'border-purple-300', text: 'text-purple-600' },
 };
 
 // ── Historial Tab ─────────────────────────────────────────────────────────────
@@ -63,6 +66,8 @@ const FILTROS_ESTADO = [
     { key: 'enDisputa',  label: 'En disputa',  color: 'text-yellow-600' },
     { key: 'confirmado', label: 'Confirmados',  color: 'text-green-600'  },
     { key: 'embarcado',  label: 'Embarcados',   color: 'text-blue-600'   },
+    { key: 'incompleto', label: 'Incompleto',   color: 'text-orange-600' },
+    { key: 'recibido',   label: 'Recibidos',    color: 'text-purple-600' },
 ];
 
 function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
@@ -95,9 +100,11 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
     }, [pedidosFiltrados, paginaActual]);
 
     const cambiarEstado = async (pedido, cod, nuevoEstado) => {
+        const BLOQUEADOS = ['incompleto', 'recibido'];
         const actualizados = pedido.productos.map(p => {
             if (p.cod !== cod) return p;
             const actual = p.estado ?? 'pendiente';
+            if (BLOQUEADOS.includes(actual)) return p;
             // Si el botón ya está activo, vuelve a pendiente (toggle)
             return { ...p, estado: actual === nuevoEstado ? 'pendiente' : nuevoEstado };
         });
@@ -197,6 +204,7 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                         const tieneDisputa   = p.productos.some(x => (x.estado ?? 'pendiente') === 'enDisputa');
                         const tieneConfirm   = p.productos.some(x => (x.estado ?? 'pendiente') === 'confirmado');
                         const tieneEmbarcado = p.productos.some(x => (x.estado ?? 'pendiente') === 'embarcado');
+                        const tieneIncompleto = p.productos.some(x => (x.estado ?? 'pendiente') === 'incompleto');
                         return {
                             key: p._id,
                             label: (
@@ -210,9 +218,10 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                                     <span className="text-xs text-gray-400">
                                         {p.productos.length} productos · {p.totalUnidades.toLocaleString('es-CL')} uds.
                                     </span>
-                                    {tieneDisputa   && <Tag color="warning">En disputa</Tag>}
-                                    {tieneConfirm   && <Tag color="success">Confirmado</Tag>}
-                                    {tieneEmbarcado && <Tag color="processing">Embarcado</Tag>}
+                                    {tieneDisputa    && <Tag color="warning">En disputa</Tag>}
+                                    {tieneConfirm    && <Tag color="success">Confirmado</Tag>}
+                                    {tieneEmbarcado  && <Tag color="processing">Embarcado</Tag>}
+                                    {tieneIncompleto && <Tag color="orange">Incompleto</Tag>}
                                     <div className="ml-auto flex gap-2 shrink-0" onClick={e => e.stopPropagation()}>
                                         <Button
                                             size="small"
@@ -238,17 +247,18 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                                         const estado = prod.estado ?? 'pendiente';
                                         const cfg = ESTADOS[estado] ?? ESTADOS.pendiente;
                                         const busy = guardando === p._id + prod.cod;
+                                        const bloqueado = ['incompleto', 'recibido'].includes(estado);
                                         const btn = (key, icon, title, color) => {
                                             const active = estado === key;
                                             return (
                                                 <button
                                                     key={key}
                                                     onClick={() => cambiarEstado(p, prod.cod, key)}
-                                                    disabled={busy}
-                                                    title={title}
+                                                    disabled={busy || bloqueado}
+                                                    title={bloqueado ? 'Estado final, no editable' : title}
                                                     className={`shrink-0 rounded-md p-1.5 transition-colors text-base leading-none
                                                         ${active ? color.active : color.idle}
-                                                        disabled:opacity-40`}
+                                                        disabled:opacity-40 disabled:cursor-not-allowed`}
                                                 >
                                                     {icon}
                                                 </button>
@@ -264,9 +274,24 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                                                     <span className="text-sm text-[#121027] font-medium leading-tight">{prod.nombre}</span>
                                                     <span className={`text-xs font-semibold ${cfg.text}`}>{cfg.label}</span>
                                                 </div>
-                                                <span className="text-lg font-extrabold text-[#370776] shrink-0">
-                                                    {prod.cantidad.toLocaleString('es-CL')}
-                                                </span>
+                                                {estado === 'incompleto' && prod.cantidadRecibida != null ? (
+                                                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                                                        <span className="text-sm font-extrabold text-green-600">
+                                                            ✅ {prod.cantidadRecibida.toLocaleString('es-CL')} uds.
+                                                        </span>
+                                                        <span className="text-sm font-extrabold text-orange-500">
+                                                            ⚠️ {(prod.cantidad - prod.cantidadRecibida).toLocaleString('es-CL')} faltante
+                                                        </span>
+                                                    </div>
+                                                ) : estado === 'recibido' ? (
+                                                    <span className="text-sm font-extrabold text-purple-600 shrink-0">
+                                                        ✅ {(prod.cantidadRecibida ?? prod.cantidad).toLocaleString('es-CL')} uds.
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-lg font-extrabold text-[#370776] shrink-0">
+                                                        {prod.cantidad.toLocaleString('es-CL')}
+                                                    </span>
+                                                )}
                                                 <div className="flex gap-1 shrink-0">
                                                     {btn('enDisputa',  <WarningOutlined />,      'En disputa',
                                                         { active: 'text-yellow-500 bg-yellow-100 hover:bg-yellow-200', idle: 'text-gray-300 hover:text-yellow-500 hover:bg-yellow-50' })}
@@ -307,13 +332,14 @@ function fmtN(n) {
     return (n ?? 0).toLocaleString('es-CL');
 }
 
-function getCategoria(cod) {
-    const pre = String(cod ?? '').trim().substring(0, 3);
-    if (['591', '599'].includes(pre)) return 'trofeos';
-    if (['601', '602', '603'].includes(pre)) return 'publicitarios';
-    if (['501', '502', '560', '582', '586', '999'].includes(pre)) return 'pesca';
-    if (pre === '701') return 'timbres';
-    return 'otros';
+const FAMILIA_A_CATEGORIA = {
+    'PESCA':                   'pesca',
+    'TROFEOS':                 'trofeos',
+    'ARTICULOS PUBLICITARIOS': 'publicitarios',
+    'TIMBRES':                 'timbres',
+};
+function getCategoriaDeProducto(p) {
+    return FAMILIA_A_CATEGORIA[p?.familia] ?? 'otros';
 }
 
 const CATEGORIAS = [
@@ -339,55 +365,49 @@ function fmtFechaEmb(d) {
     return date.toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function EmbarquesTab() {
+
+function EmbarquesTab({ pedidos = [], refetchPedidos, refetchEmbarcados, refetchConfirmados, refetchProductos }) {
     const [datos, setDatos] = useState(null);
     const [cargando, setCargando] = useState(false);
     const [nombreArchivo, setNombreArchivo] = useState('');
     const [vistaActiva, setVistaActiva] = useState('embarcado');
     const [busquedaEmb, setBusquedaEmb] = useState('');
     const [busquedaPE, setBusquedaPE] = useState('');
-    const [busquedaParc, setBusquedaParc] = useState('');
+    const [subVistaEmb, setSubVistaEmb]       = useState('factura');
+    const [primeraCarga, setPrimeraCarga]     = useState(false);
+    const [seleccionados, setSeleccionados]   = useState(new Set());
+    const [confirmando, setConfirmando]       = useState(false);
+    const [busquedaConc, setBusquedaConc]     = useState('');
 
     const handleFile = useCallback((file) => {
         setCargando(true);
         const reader = new FileReader();
-        reader.onload = async (e) => {
+        reader.onload = (e) => {
             try {
-                const wb = new ExcelJS.Workbook();
-                await wb.xlsx.load(e.target.result);
+                const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+                const names = wb.SheetNames;
+                const embName = names.find(n => n.toLowerCase() === 'embarcado');
+                const peName  = names.find(n => n.toLowerCase().replace(/\s/g, '') === 'porembarcar');
 
-                const embSheet = wb.worksheets.find(ws => ws.name.toLowerCase() === 'embarcado');
-                const peSheet  = wb.worksheets.find(ws => ws.name.toLowerCase().replace(/\s/g, '') === 'porembarcar');
+                const parseSheet = (name) =>
+                    name ? XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) : [];
 
-                const parseSheet = (sheet) => {
-                    if (!sheet) return [];
-                    const rows = [];
-                    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-                        if (rowNumber === 1) return;
-                        const v = row.values;
-                        rows.push([v[1], v[2], v[3], v[4], v[5], v[6], v[7]]);
-                    });
-                    return rows;
-                };
+                const embRows = parseSheet(embName);
+                const peRows  = parseSheet(peName);
 
-                const toDate = (v) => (v instanceof Date ? v : null);
-
-                const embRows = parseSheet(embSheet);
-                const peRows  = parseSheet(peSheet);
-
-                const embarcado = embRows.map(r => ({
+                const embarcado = embRows.slice(1).map(r => ({
                     codigo:        r[0],
-                    fechaPedido:   toDate(r[1]),
+                    fechaPedido:   r[1] instanceof Date ? r[1] : null,
                     descripcion:   String(r[2] || '').trim(),
                     pedido:        Number(r[3]) || 0,
-                    fechaEmbarque: toDate(r[4]),
+                    fechaEmbarque: r[4] instanceof Date ? r[4] : null,
                     factura:       String(r[5] || 'Sin factura').trim(),
                     embarcado:     Number(r[6]) || 0,
                 })).filter(r => r.codigo && r.descripcion);
 
-                const porEmbarcar = peRows.map(r => ({
+                const porEmbarcar = peRows.slice(1).map(r => ({
                     codigo:      r[0],
-                    fechaPedido: toDate(r[1]),
+                    fechaPedido: r[1] instanceof Date ? r[1] : null,
                     descripcion: String(r[2] || '').trim(),
                     pedido:      Number(r[3]) || 0,
                 })).filter(r => r.codigo && r.descripcion);
@@ -400,6 +420,7 @@ function EmbarquesTab() {
 
                 setDatos({ embarcado, porEmbarcar });
                 setNombreArchivo(file.name);
+                setPrimeraCarga(true);
                 message.success(`${embarcado.length} embarcados · ${porEmbarcar.length} por embarcar`);
             } catch {
                 message.error('No se pudo leer el archivo. Verifica el formato.');
@@ -452,46 +473,130 @@ function EmbarquesTab() {
             .sort((a, b) => b.diasEspera - a.diasEspera);
     }, [datos, busquedaPE]);
 
-    const parciales = useMemo(() => {
-        if (!datos?.embarcado || !datos?.porEmbarcar) return [];
-        const historial = {};
+    // ── Por embarcar desde dashboard (pedidos confirmados) ───────────────────
+    const porEmbarcarDashboard = useMemo(() => {
+        const map = {};
+        pedidos.forEach(pedido => {
+            pedido.productos.forEach(prod => {
+                if (prod.estado !== 'confirmado') return;
+                const cod = String(prod.cod).trim();
+                if (!map[cod]) map[cod] = {
+                    codigo: cod,
+                    descripcion: prod.nombre,
+                    pedido: 0,
+                    fechaPedido: pedido.createdAt ? new Date(pedido.createdAt) : null,
+                };
+                map[cod].pedido += prod.cantidad;
+                const d = pedido.createdAt ? new Date(pedido.createdAt) : null;
+                if (d && (!map[cod].fechaPedido || d < map[cod].fechaPedido)) map[cod].fechaPedido = d;
+            });
+        });
+        return Object.values(map).sort((a, b) => (b.pedido || 0) - (a.pedido || 0));
+    }, [pedidos]);
+
+    const porEmbarcarDashboardFiltrado = useMemo(() => {
+        const q = busquedaPE.trim().toLowerCase();
+        const hoy = Date.now();
+        return porEmbarcarDashboard
+            .filter(i => !q || i.descripcion.toLowerCase().includes(q) || String(i.codigo).includes(q))
+            .map(i => ({
+                ...i,
+                diasEspera: i.fechaPedido ? Math.round((hoy - i.fechaPedido) / 86400000) : 0,
+            }))
+            .sort((a, b) => b.diasEspera - a.diasEspera);
+    }, [porEmbarcarDashboard, busquedaPE]);
+
+    // ── Por producto: agrupa embarcados por código (para sub-vista) ─────────
+    const porProducto = useMemo(() => {
+        if (!datos?.embarcado) return [];
+        const map = {};
         datos.embarcado.forEach(item => {
             const cod = String(item.codigo).trim();
-            if (!historial[cod]) historial[cod] = { totalRecibido: 0, ultimoEmbarque: null, nEnvios: 0 };
-            historial[cod].totalRecibido += (item.embarcado || item.pedido || 0);
-            historial[cod].nEnvios++;
-            if (item.fechaEmbarque && (!historial[cod].ultimoEmbarque || item.fechaEmbarque > historial[cod].ultimoEmbarque)) {
-                historial[cod].ultimoEmbarque = item.fechaEmbarque;
+            if (!map[cod]) map[cod] = { cod, descripcion: item.descripcion, totalRecibido: 0, facturasSet: new Set(), ultimoEmbarque: null };
+            map[cod].totalRecibido += (item.embarcado || item.pedido || 0);
+            map[cod].facturasSet.add(item.factura);
+            if (item.fechaEmbarque && (!map[cod].ultimoEmbarque || item.fechaEmbarque > map[cod].ultimoEmbarque)) {
+                map[cod].ultimoEmbarque = item.fechaEmbarque;
             }
         });
-        const hoy = Date.now();
-        return datos.porEmbarcar
-            .filter(item => historial[String(item.codigo).trim()])
-            .map(item => {
-                const h = historial[String(item.codigo).trim()];
-                return {
-                    ...item,
-                    totalRecibido: h.totalRecibido,
-                    ultimoEmbarque: h.ultimoEmbarque,
-                    nEnvios: h.nEnvios,
-                    diasEspera: item.fechaPedido ? Math.round((hoy - item.fechaPedido) / 86400000) : 0,
-                };
-            })
-            .sort((a, b) => b.diasEspera - a.diasEspera);
+        return Object.values(map)
+            .map(({ facturasSet, ...p }) => ({ ...p, nEnvios: facturasSet.size }))
+            .sort((a, b) => b.totalRecibido - a.totalRecibido);
     }, [datos]);
 
-    const parcialesFiltrados = useMemo(() => {
-        const q = busquedaParc.trim().toLowerCase();
-        if (!q) return parciales;
-        return parciales.filter(i => i.descripcion.toLowerCase().includes(q) || String(i.codigo).includes(q));
-    }, [parciales, busquedaParc]);
+    const porProductoFiltrado = useMemo(() => {
+        const q = busquedaEmb.trim().toLowerCase();
+        if (!q) return porProducto;
+        return porProducto.filter(p => p.descripcion.toLowerCase().includes(q) || p.cod.toLowerCase().includes(q));
+    }, [porProducto, busquedaEmb]);
 
+    // ── Conciliación: cruce Excel vs pedidos activos de la BD ────────────────
+    const conciliacion = useMemo(() => {
+        if (!datos?.embarcado || !pedidos?.length) return [];
+        const excelMap = {};
+        datos.embarcado.forEach(item => {
+            const cod = String(item.codigo).trim();
+            excelMap[cod] = (excelMap[cod] || 0) + (item.embarcado || item.pedido || 0);
+        });
+        const matches = {};
+        pedidos.forEach(pedido => {
+            pedido.productos.forEach(prod => {
+                if (!['pendiente', 'confirmado', 'embarcado', 'incompleto'].includes(prod.estado ?? 'pendiente')) return;
+                if (!excelMap[prod.cod]) return;
+                if (!matches[prod.cod]) {
+                    matches[prod.cod] = { cod: prod.cod, nombre: prod.nombre, totalPedido: 0, cantidadExcel: excelMap[prod.cod] };
+                }
+                matches[prod.cod].totalPedido += prod.estado === 'incompleto'
+                    ? prod.cantidad - (prod.cantidadRecibida ?? 0)
+                    : prod.cantidad;
+            });
+        });
+        return Object.values(matches);
+    }, [datos, pedidos]);
+
+    const conciliacionFiltrada = useMemo(() => {
+        const q = busquedaConc.trim().toLowerCase();
+        if (!q) return conciliacion;
+        return conciliacion.filter(c => c.nombre.toLowerCase().includes(q) || String(c.cod).includes(q));
+    }, [conciliacion, busquedaConc]);
+
+    // ── Auto-navegación al cargar un archivo nuevo ───────────────────────────
+    useEffect(() => {
+        if (!primeraCarga) return;
+        setVistaActiva(conciliacion.length > 0 ? 'conciliacion' : 'embarcado');
+        setPrimeraCarga(false);
+    }, [primeraCarga, conciliacion]);
+
+    const handleConfirmarRecibidos = useCallback(async () => {
+        setConfirmando(true);
+        try {
+            const items = conciliacion
+                .filter(c => seleccionados.has(c.cod))
+                .map(c => ({ cod: c.cod, cantidadRecibida: c.cantidadExcel }));
+            await pedidosApi.confirmarRecibidos(items);
+            message.success(`${items.length} producto${items.length !== 1 ? 's' : ''} marcado${items.length !== 1 ? 's' : ''} como recibido${items.length !== 1 ? 's' : ''}`);
+            refetchPedidos?.();
+            refetchEmbarcados?.();
+            refetchConfirmados?.();
+            refetchProductos?.();
+            setSeleccionados(new Set());
+            setVistaActiva('embarcado');
+        } catch {
+            message.error('No se pudo actualizar los estados.');
+        } finally {
+            setConfirmando(false);
+        }
+    }, [conciliacion, seleccionados, refetchPedidos, refetchEmbarcados, refetchConfirmados, refetchProductos]);
+
+    // ── Empty state ──────────────────────────────────────────────────────────
     if (!datos) {
         return (
             <div className="flex flex-col items-center justify-center py-12 gap-5">
                 <Spin spinning={cargando}>
                     <div className="flex flex-col items-center gap-5 w-full max-w-lg">
-                        <div className="w-16 h-16 rounded-2xl bg-[#f0ebff] flex items-center justify-center text-3xl select-none">🚢</div>
+                        <div className="w-16 h-16 rounded-2xl bg-[#f0ebff] flex items-center justify-center text-3xl select-none">
+                            🚢
+                        </div>
                         <div className="text-center">
                             <p className="text-base font-bold text-[#121027] mb-1">Seguimiento de embarques</p>
                             <p className="text-sm text-gray-400 leading-relaxed">
@@ -522,17 +627,21 @@ function EmbarquesTab() {
         );
     }
 
-    const totalEnvios = gruposEmbarcado.length;
-    const totalUdsEmb = datos.embarcado.reduce((s, i) => s + (i.embarcado || i.pedido || 0), 0);
-    const totalUdsPE  = datos.porEmbarcar.reduce((s, i) => s + i.pedido, 0);
-    const hoyTs       = Date.now();
-    const maxEspera   = datos.porEmbarcar.reduce((mx, i) => {
+    // ── KPIs ─────────────────────────────────────────────────────────────────
+    const totalEnvios   = gruposEmbarcado.length;
+    const totalUdsEmb   = datos.embarcado.reduce((s, i) => s + (i.embarcado || i.pedido || 0), 0);
+    const totalUdsPE    = datos.porEmbarcar.reduce((s, i) => s + i.pedido, 0);
+    const totalUdsPEDash = porEmbarcarDashboard.reduce((s, i) => s + i.pedido, 0);
+    const totalPE       = datos.porEmbarcar.length + porEmbarcarDashboard.length;
+    const hoyTs         = Date.now();
+    const maxEspera     = [...datos.porEmbarcar, ...porEmbarcarDashboard].reduce((mx, i) => {
         const d = i.fechaPedido ? Math.round((hoyTs - i.fechaPedido) / 86400000) : 0;
         return d > mx ? d : mx;
     }, 0);
 
     return (
         <div className="flex flex-col gap-4 pb-5">
+            {/* Bar: archivo cargado */}
             <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-3 flex-wrap">
                 <span className="text-xs text-gray-400">Archivo:</span>
                 <span className="text-sm font-semibold text-[#370776] truncate max-w-xs">{nombreArchivo}</span>
@@ -541,6 +650,7 @@ function EmbarquesTab() {
                 </Upload>
             </div>
 
+            {/* KPI cards */}
             <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white rounded-xl border border-gray-200 px-4 py-3.5">
                     <p className="text-xs text-gray-400 mb-1">Envíos recibidos</p>
@@ -549,8 +659,8 @@ function EmbarquesTab() {
                 </div>
                 <div className="bg-white rounded-xl border border-gray-200 px-4 py-3.5">
                     <p className="text-xs text-gray-400 mb-1">Por embarcar</p>
-                    <p className="text-2xl font-extrabold text-orange-500 leading-none">{datos.porEmbarcar.length}</p>
-                    <p className="text-xs text-gray-400 mt-1">{fmtN(totalUdsPE)} uds. pendientes</p>
+                    <p className="text-2xl font-extrabold text-orange-500 leading-none">{totalPE}</p>
+                    <p className="text-xs text-gray-400 mt-1">{fmtN(totalUdsPE + totalUdsPEDash)} uds. pendientes</p>
                 </div>
                 <div className="bg-white rounded-xl border border-gray-200 px-4 py-3.5">
                     <p className="text-xs text-gray-400 mb-1">Espera más larga</p>
@@ -561,11 +671,12 @@ function EmbarquesTab() {
                 </div>
             </div>
 
+            {/* Toggle vista */}
             <div className="flex gap-2 flex-wrap">
                 {[
-                    { key: 'embarcado',   label: '🚢 Embarcados',      count: datos.embarcado.length },
-                    { key: 'porEmbarcar', label: '⏳ Por embarcar',     count: datos.porEmbarcar.length },
-                    { key: 'parciales',   label: '📦 Envíos parciales', count: parciales.length },
+                    { key: 'embarcado',   label: '🚢 Embarcados',   count: datos.embarcado.length },
+                    { key: 'porEmbarcar', label: '⏳ Por embarcar',  count: totalPE },
+                    ...(conciliacion.length > 0 ? [{ key: 'conciliacion', label: '✅ Conciliación', count: conciliacion.length }] : []),
                 ].map(v => (
                     <button
                         key={v.key}
@@ -581,104 +692,347 @@ function EmbarquesTab() {
                 ))}
             </div>
 
+            {/* ── EMBARCADOS ── */}
             {vistaActiva === 'embarcado' && (
                 <div className="flex flex-col gap-3">
                     <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-4 flex-wrap">
-                        <Search placeholder="Buscar por producto, código o factura..." allowClear style={{ flex: 1, minWidth: 220, maxWidth: 400 }} value={busquedaEmb} onChange={e => setBusquedaEmb(e.target.value)} />
-                        <span className="ml-auto text-sm font-semibold text-[#121027] shrink-0">{gruposFiltrados.length} envío{gruposFiltrados.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    {gruposFiltrados.length === 0 ? <Empty description="Sin resultados." className="py-12" /> : (
-                        <Collapse expandIconPosition="end" className="bg-transparent" style={{ border: 'none' }}
-                            items={gruposFiltrados.map(g => {
-                                const totalUds = g.items.reduce((s, i) => s + (i.embarcado || i.pedido || 0), 0);
-                                return {
-                                    key: g.factura,
-                                    label: (
-                                        <div className="flex items-center gap-3 w-full min-w-0">
-                                            <span className="font-semibold text-[#121027] shrink-0">{fmtFechaEmb(g.fechaEmbarque)}</span>
-                                            <span className="font-mono text-xs font-semibold text-[#370776] shrink-0">{g.factura}</span>
-                                            <span className="text-xs text-gray-400">{g.items.length} producto{g.items.length !== 1 ? 's' : ''} · {fmtN(totalUds)} uds.</span>
-                                        </div>
-                                    ),
-                                    children: (
-                                        <Table dataSource={g.items.map((item, idx) => ({ ...item, key: idx }))} size="small" bordered pagination={false} rowKey="key"
-                                            columns={[
-                                                { title: 'Código', dataIndex: 'codigo', width: 110, render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span> },
-                                                { title: 'Descripción', dataIndex: 'descripcion', render: v => <span className="text-sm text-[#121027]">{v}</span> },
-                                                { title: 'Fecha pedido', dataIndex: 'fechaPedido', width: 130, align: 'center', render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span> },
-                                                { title: 'Cantidad', key: 'cantidad', width: 110, align: 'right', render: (_, r) => <span className="text-sm font-bold text-[#370776] tabular-nums">{fmtN(r.embarcado || r.pedido || 0)}</span> },
-                                            ]}
-                                            rowClassName={() => 'hover:bg-[#f6f2ff]'}
-                                        />
-                                    ),
-                                };
-                            })}
+                        <Search
+                            placeholder={subVistaEmb === 'factura' ? 'Buscar por producto, código o factura...' : 'Buscar por producto o código...'}
+                            allowClear
+                            style={{ flex: 1, minWidth: 220, maxWidth: 400 }}
+                            value={busquedaEmb}
+                            onChange={e => setBusquedaEmb(e.target.value)}
                         />
-                    )}
-                </div>
-            )}
-
-            {vistaActiva === 'parciales' && (
-                <div className="flex flex-col gap-3">
-                    <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-4 flex-wrap">
-                        <Search placeholder="Buscar por producto o código..." allowClear style={{ flex: 1, minWidth: 220, maxWidth: 400 }} value={busquedaParc} onChange={e => setBusquedaParc(e.target.value)} />
-                        <span className="ml-auto text-sm font-semibold text-[#121027] shrink-0">{parcialesFiltrados.length} producto{parcialesFiltrados.length !== 1 ? 's' : ''} con envío partido</span>
-                    </div>
-                    {parcialesFiltrados.length === 0 ? <Empty description="Sin resultados." className="py-12" /> : (
-                        <div className="overflow-x-auto">
-                            <Table dataSource={parcialesFiltrados.map((item, i) => ({ ...item, key: i }))} rowKey="key" size="small" bordered tableLayout="fixed" pagination={{ pageSize: 50, showSizeChanger: false }} scroll={{ x: 'max-content' }}
-                                columns={[
-                                    { title: 'Código', dataIndex: 'codigo', width: 110, render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span> },
-                                    { title: 'Descripción', dataIndex: 'descripcion', render: v => <span className="text-sm text-[#121027]">{v}</span> },
-                                    { title: 'Último embarque', dataIndex: 'ultimoEmbarque', width: 150, align: 'center', render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span> },
-                                    { title: 'Ya recibido', dataIndex: 'totalRecibido', width: 120, align: 'right', render: v => <span className="text-sm font-bold text-green-600 tabular-nums">{fmtN(v)} uds.</span> },
-                                    { title: 'Pendiente', dataIndex: 'pedido', width: 110, align: 'right', render: v => <span className="text-sm font-bold text-orange-500 tabular-nums">{fmtN(v)} uds.</span> },
-                                    { title: 'Días esperando', dataIndex: 'diasEspera', width: 130, align: 'center', sorter: (a, b) => a.diasEspera - b.diasEspera, defaultSortOrder: 'descend',
-                                        render: v => {
-                                            if (!v) return <span className="text-gray-300">—</span>;
-                                            const cls = v > 180 ? 'bg-red-100 text-red-700' : v > 120 ? 'bg-orange-100 text-orange-700' : v > 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700';
-                                            return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cls}`}>{v}d</span>;
-                                        }
-                                    },
-                                ]}
-                                rowClassName={r => r.diasEspera > 180 ? '!bg-red-50 hover:!bg-red-100' : r.diasEspera > 120 ? '!bg-orange-50 hover:!bg-orange-100' : r.diasEspera > 60 ? '!bg-yellow-50 hover:!bg-yellow-100' : 'hover:bg-[#f6f2ff]'}
-                            />
+                        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 shrink-0">
+                            {[{ key: 'factura', label: 'Por factura' }, { key: 'producto', label: 'Por producto' }].map(s => (
+                                <button
+                                    key={s.key}
+                                    onClick={() => setSubVistaEmb(s.key)}
+                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-all
+                                        ${subVistaEmb === s.key ? 'bg-white text-[#370776] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                    {s.label}
+                                </button>
+                            ))}
                         </div>
+                        <span className="text-sm font-semibold text-[#121027] shrink-0">
+                            {subVistaEmb === 'factura'
+                                ? `${gruposFiltrados.length} envío${gruposFiltrados.length !== 1 ? 's' : ''}`
+                                : `${porProductoFiltrado.length} producto${porProductoFiltrado.length !== 1 ? 's' : ''}`}
+                        </span>
+                    </div>
+
+                    {/* Sub-vista: Por factura */}
+                    {subVistaEmb === 'factura' && (
+                        gruposFiltrados.length === 0 ? (
+                            <Empty description="Sin resultados." className="py-12" />
+                        ) : (
+                            <Collapse
+                                expandIconPosition="end"
+                                className="bg-transparent"
+                                style={{ border: 'none' }}
+                                items={gruposFiltrados.map(g => {
+                                    const totalUds = g.items.reduce((s, i) => s + (i.embarcado || i.pedido || 0), 0);
+                                    return {
+                                        key: g.factura,
+                                        label: (
+                                            <div className="flex items-center gap-3 w-full min-w-0">
+                                                <span className="font-semibold text-[#121027] shrink-0">{fmtFechaEmb(g.fechaEmbarque)}</span>
+                                                <span className="font-mono text-xs font-semibold text-[#370776] shrink-0">{g.factura}</span>
+                                                <span className="text-xs text-gray-400">
+                                                    {g.items.length} producto{g.items.length !== 1 ? 's' : ''} · {fmtN(totalUds)} uds.
+                                                </span>
+                                            </div>
+                                        ),
+                                        children: (
+                                            <Table
+                                                dataSource={g.items.map((item) => ({ ...item, key: `${item.factura ?? g.factura}-${item.codigo}` }))}
+                                                size="small" bordered pagination={false} rowKey="key"
+                                                columns={[
+                                                    { title: 'Código', dataIndex: 'codigo', width: 110, render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span> },
+                                                    { title: 'Descripción', dataIndex: 'descripcion', render: v => <span className="text-sm text-[#121027]">{v}</span> },
+                                                    { title: 'Fecha pedido', dataIndex: 'fechaPedido', width: 130, align: 'center', render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span> },
+                                                    { title: 'Cantidad', key: 'cantidad', width: 110, align: 'right', render: (_, r) => <span className="text-sm font-bold text-[#370776] tabular-nums">{fmtN(r.embarcado || r.pedido || 0)}</span> },
+                                                ]}
+                                                rowClassName={() => 'hover:bg-[#f6f2ff]'}
+                                            />
+                                        ),
+                                    };
+                                })}
+                            />
+                        )
+                    )}
+
+                    {/* Sub-vista: Por producto */}
+                    {subVistaEmb === 'producto' && (
+                        porProductoFiltrado.length === 0 ? (
+                            <Empty description="Sin resultados." className="py-12" />
+                        ) : (
+                            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                                <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                                    <span className="text-xs font-semibold text-gray-500 flex-1">Producto</span>
+                                    <span className="text-xs font-semibold text-gray-500 w-20 text-center">Envíos</span>
+                                    <span className="text-xs font-semibold text-gray-500 w-28 text-right">Total recibido</span>
+                                    <span className="text-xs font-semibold text-gray-500 w-32 text-right">Último embarque</span>
+                                </div>
+                                {porProductoFiltrado.map(p => (
+                                    <div key={p.cod} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 hover:bg-[#f6f2ff] transition-colors">
+                                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                            <span className="text-xs text-gray-400 font-mono font-semibold">{p.cod}</span>
+                                            <span className="text-sm text-[#121027] font-medium leading-tight truncate">{p.descripcion}</span>
+                                        </div>
+                                        <div className="w-20 flex justify-center">
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${p.nEnvios > 1 ? 'bg-[#f0ebff] text-[#370776]' : 'bg-gray-100 text-gray-500'}`}>
+                                                {p.nEnvios} envío{p.nEnvios !== 1 ? 's' : ''}
+                                            </span>
+                                        </div>
+                                        <span className="text-sm font-bold text-[#370776] tabular-nums w-28 text-right">{fmtN(p.totalRecibido)} uds.</span>
+                                        <span className="text-xs text-gray-500 w-32 text-right">{fmtFechaEmb(p.ultimoEmbarque)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )
                     )}
                 </div>
             )}
 
+            {/* ── POR EMBARCAR ── */}
             {vistaActiva === 'porEmbarcar' && (
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-4">
                     <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 flex items-center gap-4 flex-wrap">
-                        <Search placeholder="Buscar por producto o código..." allowClear style={{ flex: 1, minWidth: 220, maxWidth: 400 }} value={busquedaPE} onChange={e => setBusquedaPE(e.target.value)} />
+                        <Search
+                            placeholder="Buscar por producto o código..."
+                            allowClear
+                            style={{ flex: 1, minWidth: 220, maxWidth: 400 }}
+                            value={busquedaPE}
+                            onChange={e => setBusquedaPE(e.target.value)}
+                        />
                         <div className="ml-auto flex items-center gap-3 shrink-0">
                             <div className="flex items-center gap-1.5 text-xs text-gray-400">
                                 <span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-100 border border-red-200" /> +180d
                                 <span className="inline-block w-2.5 h-2.5 rounded-sm bg-orange-100 border border-orange-200 ml-1" /> +120d
                                 <span className="inline-block w-2.5 h-2.5 rounded-sm bg-yellow-100 border border-yellow-200 ml-1" /> +60d
                             </div>
-                            <span className="text-sm font-semibold text-[#121027]">{porEmbarcarFiltrado.length} productos</span>
+                            <span className="text-sm font-semibold text-[#121027]">
+                                {porEmbarcarDashboardFiltrado.length + porEmbarcarFiltrado.length} productos
+                            </span>
                         </div>
                     </div>
-                    <div className="overflow-x-auto">
-                        <Table dataSource={porEmbarcarFiltrado} rowKey={(_, i) => i} size="small" bordered tableLayout="fixed" pagination={{ pageSize: 50, showSizeChanger: false }} scroll={{ x: 'max-content' }}
-                            columns={[
-                                { title: 'Código', dataIndex: 'codigo', width: 110, render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span> },
-                                { title: 'Descripción', dataIndex: 'descripcion', render: v => <span className="text-sm text-[#121027]">{v}</span> },
-                                { title: 'Fecha pedido', dataIndex: 'fechaPedido', width: 130, align: 'center', render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span> },
-                                { title: 'Días esperando', dataIndex: 'diasEspera', width: 130, align: 'center', sorter: (a, b) => a.diasEspera - b.diasEspera, defaultSortOrder: 'descend',
-                                    render: v => {
-                                        if (!v) return <span className="text-gray-300">—</span>;
-                                        const cls = v > 180 ? 'bg-red-100 text-red-700' : v > 120 ? 'bg-orange-100 text-orange-700' : v > 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700';
-                                        return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cls}`}>{v}d</span>;
+
+                    {/* Sección: confirmados en dashboard */}
+                    {porEmbarcarDashboardFiltrado.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-2 px-1">
+                                <span className="text-xs font-bold text-[#370776] uppercase tracking-wide">Dashboard</span>
+                                <span className="text-xs text-gray-400">· {porEmbarcarDashboardFiltrado.length} producto{porEmbarcarDashboardFiltrado.length !== 1 ? 's' : ''} confirmados aguardando embarque</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <Table
+                                    dataSource={porEmbarcarDashboardFiltrado}
+                                    rowKey="codigo"
+                                    size="small"
+                                    bordered
+                                    tableLayout="fixed"
+                                    pagination={{ pageSize: 50, showSizeChanger: false }}
+                                    scroll={{ x: 'max-content' }}
+                                    columns={[
+                                        {
+                                            title: 'Código',
+                                            dataIndex: 'codigo', width: 110,
+                                            render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span>,
+                                        },
+                                        {
+                                            title: 'Descripción',
+                                            dataIndex: 'descripcion',
+                                            render: v => <span className="text-sm text-[#121027]">{v}</span>,
+                                        },
+                                        {
+                                            title: 'Fecha confirmación',
+                                            dataIndex: 'fechaPedido', width: 150, align: 'center',
+                                            render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span>,
+                                        },
+                                        {
+                                            title: 'Días esperando',
+                                            dataIndex: 'diasEspera', width: 130, align: 'center',
+                                            sorter: (a, b) => a.diasEspera - b.diasEspera,
+                                            defaultSortOrder: 'descend',
+                                            render: v => {
+                                                if (!v) return <span className="text-gray-300">—</span>;
+                                                const cls = v > 180 ? 'bg-red-100 text-red-700'
+                                                    : v > 120 ? 'bg-orange-100 text-orange-700'
+                                                    : v > 60  ? 'bg-yellow-100 text-yellow-700'
+                                                    : 'bg-green-100 text-green-700';
+                                                return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cls}`}>{v}d</span>;
+                                            },
+                                        },
+                                        {
+                                            title: 'Cantidad',
+                                            dataIndex: 'pedido', width: 110, align: 'right',
+                                            render: v => <span className="text-sm font-bold text-[#370776] tabular-nums">{fmtN(v)}</span>,
+                                        },
+                                    ]}
+                                    rowClassName={(r) =>
+                                        r.diasEspera > 180 ? '!bg-red-50 hover:!bg-red-100'
+                                        : r.diasEspera > 120 ? '!bg-orange-50 hover:!bg-orange-100'
+                                        : r.diasEspera > 60  ? '!bg-yellow-50 hover:!bg-yellow-100'
+                                        : 'hover:bg-[#f6f2ff]'
                                     }
-                                },
-                                { title: 'Cantidad', dataIndex: 'pedido', width: 110, align: 'right', render: v => <span className="text-sm font-bold text-[#370776] tabular-nums">{fmtN(v)}</span> },
-                            ]}
-                            rowClassName={r => r.diasEspera > 180 ? '!bg-red-50 hover:!bg-red-100' : r.diasEspera > 120 ? '!bg-orange-50 hover:!bg-orange-100' : r.diasEspera > 60 ? '!bg-yellow-50 hover:!bg-yellow-100' : 'hover:bg-[#f6f2ff]'}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Sección: por embarcar desde Excel */}
+                    {porEmbarcarFiltrado.length > 0 && (
+                        <div className="flex flex-col gap-2">
+                            {porEmbarcarDashboardFiltrado.length > 0 && (
+                                <div className="flex items-center gap-2 px-1">
+                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Excel</span>
+                                    <span className="text-xs text-gray-400">· {porEmbarcarFiltrado.length} producto{porEmbarcarFiltrado.length !== 1 ? 's' : ''} en el sistema del cliente</span>
+                                </div>
+                            )}
+                            <div className="overflow-x-auto">
+                                <Table
+                                    dataSource={porEmbarcarFiltrado}
+                                    rowKey="codigo"
+                                    size="small"
+                                    bordered
+                                    tableLayout="fixed"
+                                    pagination={{ pageSize: 50, showSizeChanger: false }}
+                                    scroll={{ x: 'max-content' }}
+                                    columns={[
+                                        {
+                                            title: 'Código',
+                                            dataIndex: 'codigo', width: 110,
+                                            render: v => <span className="font-mono text-xs font-semibold text-[#370776]">{v}</span>,
+                                        },
+                                        {
+                                            title: 'Descripción',
+                                            dataIndex: 'descripcion',
+                                            render: v => <span className="text-sm text-[#121027]">{v}</span>,
+                                        },
+                                        {
+                                            title: 'Fecha pedido',
+                                            dataIndex: 'fechaPedido', width: 130, align: 'center',
+                                            render: v => <span className="text-xs text-gray-500">{fmtFechaEmb(v)}</span>,
+                                        },
+                                        {
+                                            title: 'Días esperando',
+                                            dataIndex: 'diasEspera', width: 130, align: 'center',
+                                            sorter: (a, b) => a.diasEspera - b.diasEspera,
+                                            defaultSortOrder: 'descend',
+                                            render: v => {
+                                                if (!v) return <span className="text-gray-300">—</span>;
+                                                const cls = v > 180 ? 'bg-red-100 text-red-700'
+                                                    : v > 120 ? 'bg-orange-100 text-orange-700'
+                                                    : v > 60  ? 'bg-yellow-100 text-yellow-700'
+                                                    : 'bg-green-100 text-green-700';
+                                                return <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cls}`}>{v}d</span>;
+                                            },
+                                        },
+                                        {
+                                            title: 'Cantidad',
+                                            dataIndex: 'pedido', width: 110, align: 'right',
+                                            render: v => <span className="text-sm font-bold text-[#370776] tabular-nums">{fmtN(v)}</span>,
+                                        },
+                                    ]}
+                                    rowClassName={(r) =>
+                                        r.diasEspera > 180 ? '!bg-red-50 hover:!bg-red-100'
+                                        : r.diasEspera > 120 ? '!bg-orange-50 hover:!bg-orange-100'
+                                        : r.diasEspera > 60  ? '!bg-yellow-50 hover:!bg-yellow-100'
+                                        : 'hover:bg-[#f6f2ff]'
+                                    }
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {porEmbarcarDashboardFiltrado.length === 0 && porEmbarcarFiltrado.length === 0 && (
+                        <Empty description="Sin productos por embarcar." className="py-12" />
+                    )}
+                </div>
+            )}
+
+            {/* ── CONCILIACIÓN ── */}
+            {vistaActiva === 'conciliacion' && (
+                <div className="flex flex-col gap-4">
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <Search
+                            placeholder="Buscar por nombre o código..."
+                            allowClear
+                            style={{ maxWidth: 320 }}
+                            value={busquedaConc}
+                            onChange={e => setBusquedaConc(e.target.value)}
                         />
+                        <div className="ml-auto flex items-center gap-3">
+                            <span className="text-sm text-gray-500">
+                                {seleccionados.size} seleccionado{seleccionados.size !== 1 ? 's' : ''}
+                            </span>
+                            <Button
+                                type="primary"
+                                style={{ background: '#370776', borderColor: '#370776' }}
+                                disabled={seleccionados.size === 0}
+                                loading={confirmando}
+                                onClick={handleConfirmarRecibidos}
+                            >
+                                Confirmar recibidos
+                            </Button>
+                        </div>
                     </div>
+
+                    {conciliacionFiltrada.length === 0 ? (
+                        <Empty description="Sin coincidencias." className="py-12" />
+                    ) : (
+                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                            <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border-b border-gray-200">
+                                <input
+                                    type="checkbox"
+                                    checked={conciliacionFiltrada.length > 0 && conciliacionFiltrada.every(c => seleccionados.has(c.cod))}
+                                    onChange={e => {
+                                        if (e.target.checked) setSeleccionados(new Set(conciliacionFiltrada.map(c => c.cod)));
+                                        else setSeleccionados(new Set());
+                                    }}
+                                    className="w-4 h-4 accent-[#370776]"
+                                />
+                                <span className="text-xs font-semibold text-gray-500 flex-1">Producto</span>
+                                <span className="text-xs font-semibold text-gray-500 w-24 text-right">Pedido</span>
+                                <span className="text-xs font-semibold text-gray-500 w-24 text-right">Excel</span>
+                                <span className="text-xs font-semibold text-gray-500 w-24 text-right">Diferencia</span>
+                            </div>
+                            {conciliacionFiltrada.map(c => {
+                                const diff = c.cantidadExcel - c.totalPedido;
+                                const checked = seleccionados.has(c.cod);
+                                return (
+                                    <div
+                                        key={c.cod}
+                                        onClick={() => setSeleccionados(prev => {
+                                            const next = new Set(prev);
+                                            checked ? next.delete(c.cod) : next.add(c.cod);
+                                            return next;
+                                        })}
+                                        className={`flex items-center gap-3 px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors
+                                            ${checked ? 'bg-[#f0ebff]' : 'hover:bg-gray-50'}`}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => {}}
+                                            className="w-4 h-4 accent-[#370776] pointer-events-none"
+                                        />
+                                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                            <span className="text-xs text-gray-400 font-mono font-semibold">{c.cod}</span>
+                                            <span className="text-sm text-[#121027] font-medium leading-tight truncate">{c.nombre}</span>
+                                        </div>
+                                        <span className="text-sm font-semibold text-gray-700 w-24 text-right tabular-nums">{fmtN(c.totalPedido)}</span>
+                                        <span className="text-sm font-semibold text-[#370776] w-24 text-right tabular-nums">{fmtN(c.cantidadExcel)}</span>
+                                        <span className={`text-sm font-bold w-24 text-right tabular-nums ${diff >= 0 ? 'text-green-600' : 'text-orange-500'}`}>
+                                            {diff >= 0 ? '+' : ''}{fmtN(diff)}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
         </div>
@@ -702,10 +1056,14 @@ export default function Compras() {
     const [pedidoCods, setPedidoCods] = useState([]);
     const [pedidoInfo, setPedidoInfo] = useState({});
 
+    const initialLoadDone = useRef(false);
     useEffect(() => {
         if (rawProductos.length > 0) {
             setFilas(rawProductos);
-            setAPedir({});
+            if (!initialLoadDone.current) {
+                setAPedir({});
+                initialLoadDone.current = true;
+            }
         }
     }, [rawProductos]);
 
@@ -741,7 +1099,7 @@ export default function Compras() {
         const counts = { todos: 0, trofeos: 0, publicitarios: 0, pesca: 0, timbres: 0, otros: 0 };
         (filas ?? []).forEach(p => {
             counts.todos++;
-            const cat = getCategoria(p.cod);
+            const cat = getCategoriaDeProducto(p);
             if (counts[cat] !== undefined) counts[cat]++;
         });
         return counts;
@@ -751,7 +1109,7 @@ export default function Compras() {
     const filasFiltradas = useMemo(() => {
         const base = searchQuery.trim() ? searchResults : (filas ?? []);
         if (categoriaSeleccionada === 'todos') return base;
-        return base.filter(p => getCategoria(p.cod) === categoriaSeleccionada);
+        return base.filter(p => getCategoriaDeProducto(p) === categoriaSeleccionada);
     }, [searchQuery, searchResults, filas, categoriaSeleccionada]);
 
     // ── Navegar entre inputs con Enter ──────────────────────────────────────
@@ -789,7 +1147,7 @@ export default function Compras() {
 
     // ── Aplicar sugerencias de la categoría activa ───────────────────────────
     const aplicarSugerenciasCategoria = useCallback(() => {
-        const fuente = filasFiltradas.filter(p => (p.sugerencia ?? 0) > 0);
+        const fuente = filasFiltradas.filter(p => (p.sugerencia ?? 0) > 0 && !p.descartado);
         if (fuente.length === 0) return;
 
         const ejecutar = () => {
@@ -924,10 +1282,17 @@ export default function Compras() {
         // ── Producto ──────────────────────────────────────────────────────────
         {
             title: 'Producto',
-            dataIndex: 'nombre', key: 'nombre', width: 200, ellipsis: true,
-            render: val => (
+            dataIndex: 'nombre', key: 'nombre', width: 220,
+            render: (val, record) => (
                 <Tooltip title={val} placement="topLeft" mouseEnterDelay={0.5}>
-                    <span className="text-sm font-medium text-[#121027] leading-tight">{val}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                        <span className={`text-sm font-medium leading-tight truncate ${record.descartado ? 'text-gray-400' : 'text-[#121027]'}`}>{val}</span>
+                        {record.descartado && (
+                            <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', flexShrink: 0, marginInlineEnd: 0 }}>
+                                Descartado
+                            </Tag>
+                        )}
+                    </div>
                 </Tooltip>
             ),
         },
@@ -1029,11 +1394,19 @@ export default function Compras() {
         },
     ];
 
-    const productosConCantidad = pedidoCods.map(cod => pedidoInfo[cod]).filter(Boolean);
+    const productosConCantidad = pedidoCods.map(cod => pedidoInfo[cod]).filter(p => p && (aPedir[p.cod] ?? 0) > 0);
 
-    const statusLabel = searchQuery.trim()
-        ? { text: `${filasFiltradas.length} resultado${filasFiltradas.length !== 1 ? 's' : ''}`, sub: `para "${searchQuery.trim()}"` }
-        : { text: `${filasFiltradas.length} producto${filasFiltradas.length !== 1 ? 's' : ''} a pedir`, sub: 'según stock y proyección' };
+    const statusLabel = useMemo(() => {
+        if (searchQuery.trim()) {
+            return { text: `${filasFiltradas.length} resultado${filasFiltradas.length !== 1 ? 's' : ''}`, sub: `para "${searchQuery.trim()}"` };
+        }
+        const prioritarios  = filasFiltradas.filter(p => !p.descartado).length;
+        const descartadosN  = filasFiltradas.filter(p =>  p.descartado).length;
+        const sub = descartadosN > 0
+            ? `según stock y proyección · ${descartadosN} descartado${descartadosN !== 1 ? 's' : ''} al final`
+            : 'según stock y proyección';
+        return { text: `${prioritarios} producto${prioritarios !== 1 ? 's' : ''} a pedir`, sub };
+    }, [searchQuery, filasFiltradas]);
 
     // ── Render ────────────────────────────────────────────────────────────────
     return (
@@ -1178,7 +1551,11 @@ export default function Compras() {
                                                     pagination={{ pageSize: 50, showSizeChanger: false }}
                                                     scroll={{ x: 'max-content' }}
                                                     onRow={() => ({ style: { cursor: 'default' } })}
-                                                    rowClassName={(record) => pedidoCods.includes(record.cod) ? '!bg-[#e8dcff] hover:!bg-[#ddd0ff]' : 'hover:bg-[#f6f2ff]'}
+                                                    rowClassName={(record) => {
+                                                        if (pedidoCods.includes(record.cod)) return '!bg-[#e8dcff] hover:!bg-[#ddd0ff]';
+                                                        if (record.descartado) return '!bg-gray-50 opacity-60 hover:!opacity-100';
+                                                        return 'hover:bg-[#f6f2ff]';
+                                                    }}
                                                 />
                                             </Spin>
                                         </div>
@@ -1204,7 +1581,7 @@ export default function Compras() {
                             {
                                 key: 'embarques',
                                 label: <span className="font-medium">🚢 Embarques</span>,
-                                children: <EmbarquesTab />,
+                                children: <EmbarquesTab pedidos={pedidos} refetchPedidos={refetchPedidos} refetchEmbarcados={refetchEmbarcados} refetchConfirmados={refetchConfirmados} refetchProductos={refetchProductos} />,
                             },
                         ]}
                     />
@@ -1263,7 +1640,10 @@ export default function Compras() {
                             >
                                 <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                                     <span className="text-xs text-gray-400 font-semibold">{p.cod}</span>
-                                    <span className="text-sm text-[#121027] font-medium leading-tight">{p.nombre}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`text-sm font-medium leading-tight ${p.descartado ? 'text-gray-400' : 'text-[#121027]'}`}>{p.nombre}</span>
+                                        {p.descartado && <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', flexShrink: 0, marginInlineEnd: 0 }}>Descartado</Tag>}
+                                    </div>
                                 </div>
                                 <input
                                     type="number" min="0"
