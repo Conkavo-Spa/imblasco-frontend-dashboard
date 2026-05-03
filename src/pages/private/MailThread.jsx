@@ -179,6 +179,35 @@ const MailThread = () => {
                                 >
                                     Bien respondido
                                 </Checkbox>
+
+                                <Button
+                                    type="default"
+                                    size="large"
+                                    onClick={() => {
+                                        console.log("Ver cotización clic");
+                                        // aquí luego conectas la visualización real
+                                    }}
+                                >
+                                    Ver Cotización
+                                </Button>
+
+                                <Button
+                                    type="primary"
+                                    size="large"
+                                    style={{
+                                        backgroundColor: '#52c41a',
+                                        borderColor: '#52c41a'
+                                    }}
+                                    onClick={() => {
+                                        console.log("Responder clic");
+                                        // aquí luego conectas tu lógica real
+                                    }}
+                                >
+                                    Responder
+                                </Button>
+
+
+
                                 {isGoodAnswerDisabled ? (
                                     <Tooltip title="Tu backend aún no soporta 'Bien respondido' para mails o hubo un error.">
                                         <InfoCircleOutlined style={{ color: 'rgba(0,0,0,.45)' }} />
