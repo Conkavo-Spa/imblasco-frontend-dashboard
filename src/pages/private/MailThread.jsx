@@ -182,7 +182,7 @@ const MailThread = () => {
 
                                 <Button
                                     type="default"
-                                    size="large"
+                                    size="middle"
                                     onClick={() => {
                                         console.log("Ver cotización clic");
                                         // aquí luego conectas la visualización real
@@ -193,7 +193,7 @@ const MailThread = () => {
 
                                 <Button
                                     type="primary"
-                                    size="large"
+                                    size="middle"
                                     style={{
                                         backgroundColor: '#52c41a',
                                         borderColor: '#52c41a'
