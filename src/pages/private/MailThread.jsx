@@ -372,7 +372,7 @@ const MailThread = () => {
 
                 <Modal
                     title="Ajustar"
-                    open={isFeedbackOpen}
+                    open={openCotizacionModal}
                     onCancel={() => setIsFeedbackOpen(false)}
                     okText="Guardar"
                     cancelText="Cancelar"
@@ -420,6 +420,7 @@ const MailThread = () => {
                 </Modal>
             </div>
         </div>
+        
     );
 };
 
