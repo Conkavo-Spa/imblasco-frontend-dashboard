@@ -94,7 +94,8 @@ const MailThread = () => {
     };
 
     const handleVerCotizacion = () => {
-        const cot = conversation?.cotizacion;
+        //const cot = conversation?.cotizacion;
+        const cot = conversation?.pdf_base64;
 
         if (!cot) {
             message.warning("No hay cotización disponible");
