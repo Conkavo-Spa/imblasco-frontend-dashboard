@@ -1413,7 +1413,7 @@ export default function Compras() {
                 const total = (record.porEmbarcar ?? 0) + (confirmados[record.cod] ?? 0);
                 return total > 0
                     ? <span className="text-sm font-semibold text-gray-600 tabular-nums">{fmtN(total)}</span>
-                    : <span className="text-xs text-gray-300">—</span>;
+                    : <span className="text-xs text-gray-400">—</span>;
             },
         },
         {
@@ -1423,7 +1423,7 @@ export default function Compras() {
                 const val = embarcados[record.cod] ?? 0;
                 return val > 0
                     ? <span className="text-sm font-semibold text-blue-500 tabular-nums">{fmtN(val)}</span>
-                    : <span className="text-xs text-gray-300">—</span>;
+                    : <span className="text-xs text-gray-400">—</span>;
             },
         },
         // ── Sugerencia ────────────────────────────────────────────────────────
@@ -1442,7 +1442,7 @@ export default function Compras() {
                             </button>
                         </Tooltip>
                     )
-                    : <span className="text-xs text-gray-300">—</span>
+                    : <span className="text-xs text-gray-400">—</span>
             ),
         },
         // ── A pedir ───────────────────────────────────────────────────────────
@@ -1567,8 +1567,8 @@ export default function Compras() {
                                                     <div className="text-sm font-semibold text-[#121027]">{statusLabel.text}</div>
                                                     <div className="text-xs text-gray-400">{statusLabel.sub}</div>
                                                     {actualizadoEl && (
-                                                        <div className="text-xs text-gray-300 mt-0.5">
-                                                            datos: {new Date(actualizadoEl).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                        <div className="text-xs text-gray-500 mt-0.5">
+                                                            stock: {new Date(actualizadoEl).toLocaleString('es-CL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                         </div>
                                                     )}
                                                 </div>
