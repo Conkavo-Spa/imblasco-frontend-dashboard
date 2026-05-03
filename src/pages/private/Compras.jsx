@@ -1051,7 +1051,10 @@ export default function Compras() {
     const [activeTab, setActiveTab] = useState('nuevo');
     const [actualizando, setActualizando] = useState(false);
     const [syncingStock, setSyncingStock] = useState(false);
+    const [syncPhase, setSyncPhase] = useState(null);
+    const [syncElapsed, setSyncElapsed] = useState(0);
     const syncPollRef = useRef(null);
+    const syncTimerRef = useRef(null);
 
     // Estado local de la tabla
     const [filas, setFilas] = useState(null);
@@ -1150,8 +1153,20 @@ export default function Compras() {
     }, []);
 
     // ── Sync stock on-demand ─────────────────────────────────────────────────
+    const stopSync = useCallback((success = false) => {
+        clearInterval(syncPollRef.current);
+        clearInterval(syncTimerRef.current);
+        setSyncingStock(false);
+        setSyncPhase(null);
+        setSyncElapsed(0);
+        if (success) message.success('Stock actualizado correctamente.');
+    }, []);
+
     const handleSyncStock = useCallback(async () => {
         setSyncingStock(true);
+        setSyncPhase('enviando');
+        setSyncElapsed(0);
+
         try {
             await comprasApi.triggerSyncStock();
         } catch (err) {
@@ -1160,43 +1175,44 @@ export default function Compras() {
             } else {
                 message.error('No se pudo iniciar la sincronización.');
             }
-            setSyncingStock(false);
+            stopSync();
             return;
         }
 
         const TIMEOUT_MS = 600_000;
         const startedAt = Date.now();
 
+        syncTimerRef.current = setInterval(() => {
+            setSyncElapsed(Math.floor((Date.now() - startedAt) / 1000));
+        }, 1000);
+
         syncPollRef.current = setInterval(async () => {
             if (Date.now() - startedAt > TIMEOUT_MS) {
-                clearInterval(syncPollRef.current);
-                setSyncingStock(false);
+                stopSync();
                 message.error('La sincronización tardó demasiado. Verifica el estado del demonio.');
                 return;
             }
             try {
                 const res = await comprasApi.getSyncStockStatus();
                 const status = res?.data?.data?.status;
-                if (status === 'done') {
-                    clearInterval(syncPollRef.current);
-                    setSyncingStock(false);
+                if (status === 'running') {
+                    setSyncPhase('running');
+                } else if (status === 'done') {
                     await refetchProductos();
-                    message.success('Stock actualizado correctamente.');
+                    stopSync(true);
                 } else if (status === 'error') {
-                    clearInterval(syncPollRef.current);
-                    setSyncingStock(false);
+                    stopSync();
                     message.error('El demonio reportó un error al sincronizar.');
                 }
             } catch {
-                clearInterval(syncPollRef.current);
-                setSyncingStock(false);
+                stopSync();
                 message.error('Error al consultar el estado de la sincronización.');
             }
         }, 3000);
-    }, [refetchProductos]);
+    }, [refetchProductos, stopSync]);
 
     useEffect(() => {
-        return () => clearInterval(syncPollRef.current);
+        return () => { clearInterval(syncPollRef.current); clearInterval(syncTimerRef.current); };
     }, []);
 
     // ── Aplicar sugerencias de la categoría activa ───────────────────────────
@@ -1556,15 +1572,58 @@ export default function Compras() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <Button
-                                                    icon={<ReloadOutlined />}
-                                                    loading={syncingStock}
-                                                    onClick={handleSyncStock}
-                                                    style={{ borderColor: '#370776', color: '#370776' }}
-                                                    size="small"
-                                                >
-                                                    {syncingStock ? 'Sincronizando...' : 'Sync stock'}
-                                                </Button>
+                                                <div style={{ minWidth: 170 }}>
+                                                    <style>{`
+                                                        @keyframes syncShimmer {
+                                                            0% { transform: translateX(-100%); }
+                                                            100% { transform: translateX(200%); }
+                                                        }
+                                                        @keyframes syncPulse {
+                                                            0%, 100% { opacity: 1; }
+                                                            50% { opacity: 0.5; }
+                                                        }
+                                                    `}</style>
+                                                    <Button
+                                                        icon={<ReloadOutlined />}
+                                                        loading={syncingStock}
+                                                        onClick={handleSyncStock}
+                                                        style={{ borderColor: '#370776', color: '#370776', width: '100%' }}
+                                                        size="small"
+                                                    >
+                                                        {!syncingStock && 'Sync stock'}
+                                                        {syncPhase === 'enviando' && 'Enviando...'}
+                                                        {syncPhase === 'running' && (
+                                                            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                                                Sincronizando&nbsp;{Math.floor(syncElapsed / 60)}:{String(syncElapsed % 60).padStart(2, '0')}
+                                                            </span>
+                                                        )}
+                                                    </Button>
+                                                    {syncingStock && (
+                                                        <div style={{ marginTop: 6 }}>
+                                                            <div style={{ width: '100%', height: 4, background: 'rgba(55,7,118,0.1)', borderRadius: 999, overflow: 'hidden' }}>
+                                                                <div style={{
+                                                                    height: '100%',
+                                                                    width: `${syncPhase === 'enviando' ? 4 : Math.min((syncElapsed / 420) * 100, 94)}%`,
+                                                                    background: 'linear-gradient(90deg, #370776, #7c3aed)',
+                                                                    borderRadius: 999,
+                                                                    transition: 'width 1s linear',
+                                                                    position: 'relative',
+                                                                    overflow: 'hidden',
+                                                                    animation: syncPhase === 'enviando' ? 'syncPulse 1.2s ease-in-out infinite' : 'none',
+                                                                }}>
+                                                                    <div style={{
+                                                                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.45) 50%, transparent 100%)',
+                                                                        animation: 'syncShimmer 1.6s ease-in-out infinite',
+                                                                    }} />
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, textAlign: 'center' }}>
+                                                                {syncPhase === 'enviando' ? 'Esperando al demonio...' : 'Actualizando stock en MongoDB...'}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 <Button
                                                     icon={<ReloadOutlined />}
                                                     loading={actualizando}
