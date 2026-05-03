@@ -1164,7 +1164,7 @@ export default function Compras() {
             return;
         }
 
-        const TIMEOUT_MS = 120_000;
+        const TIMEOUT_MS = 600_000;
         const startedAt = Date.now();
 
         syncPollRef.current = setInterval(async () => {
