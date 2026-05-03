@@ -29,6 +29,8 @@ const MailThread = () => {
     const [isGoodAnswerDisabled, setIsGoodAnswerDisabled] = useState(false);
     const [isSavingCorrected, setIsSavingCorrected] = useState(false);
     const [isCorrectedDisabled, setIsCorrectedDisabled] = useState(false);
+    const [openCotizacionModal, setOpenCotizacionModal] = useState(false);
+    const [cotizacionPdfUrl, setCotizacionPdfUrl] = useState(null);
 
     // Limpiar modales al desmontar
     useEffect(() => {
@@ -89,6 +91,12 @@ const MailThread = () => {
         } finally {
             setIsSavingGoodAnswer(false);
         }
+    };
+
+    const handleVerCotizacion = () => {
+        // por ahora solo abre el modal sin PDF (backend después)
+        setCotizacionPdfUrl(null);
+        setOpenCotizacionModal(true);
     };
 
     const messagesSorted = useMemo(() => {
@@ -183,10 +191,7 @@ const MailThread = () => {
                                 <Button
                                     type="default"
                                     size="middle"
-                                    onClick={() => {
-                                        console.log("Ver cotización clic");
-                                        // aquí luego conectas la visualización real
-                                    }}
+                                    onClick={handleVerCotizacion}
                                 >
                                     Ver Cotización
                                 </Button>
