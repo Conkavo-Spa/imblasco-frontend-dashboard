@@ -94,8 +94,26 @@ const MailThread = () => {
     };
 
     const handleVerCotizacion = () => {
-        // por ahora solo abre el modal sin PDF (backend después)
-        setCotizacionPdfUrl(null);
+        const cot = conversation?.cotizacion;
+
+        if (!cot) {
+            message.warning("No hay cotización disponible");
+            return;
+        }
+
+        if (cot.pdf) {
+            const pdfBlob = atob(cot.pdf);
+            const array = new Uint8Array(pdfBlob.length);
+            for (let i = 0; i < pdfBlob.length; i++) {
+                array[i] = pdfBlob.charCodeAt(i);
+            }
+
+            const blob = new Blob([array], { type: "application/pdf" });
+            const url = URL.createObjectURL(blob);
+
+            setCotizacionPdfUrl(url);
+        }
+
         setOpenCotizacionModal(true);
     };
 
