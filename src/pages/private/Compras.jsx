@@ -1051,7 +1051,10 @@ export default function Compras() {
     const [activeTab, setActiveTab] = useState('nuevo');
     const [actualizando, setActualizando] = useState(false);
     const [syncingStock, setSyncingStock] = useState(false);
+    const [syncPhase, setSyncPhase] = useState(null);
+    const [syncElapsed, setSyncElapsed] = useState(0);
     const syncPollRef = useRef(null);
+    const syncTimerRef = useRef(null);
 
     // Estado local de la tabla
     const [filas, setFilas] = useState(null);
@@ -1150,8 +1153,20 @@ export default function Compras() {
     }, []);
 
     // ── Sync stock on-demand ─────────────────────────────────────────────────
+    const stopSync = useCallback((success = false) => {
+        clearInterval(syncPollRef.current);
+        clearInterval(syncTimerRef.current);
+        setSyncingStock(false);
+        setSyncPhase(null);
+        setSyncElapsed(0);
+        if (success) message.success('Stock actualizado correctamente.');
+    }, []);
+
     const handleSyncStock = useCallback(async () => {
         setSyncingStock(true);
+        setSyncPhase('enviando');
+        setSyncElapsed(0);
+
         try {
             await comprasApi.triggerSyncStock();
         } catch (err) {
@@ -1160,43 +1175,44 @@ export default function Compras() {
             } else {
                 message.error('No se pudo iniciar la sincronización.');
             }
-            setSyncingStock(false);
+            stopSync();
             return;
         }
 
         const TIMEOUT_MS = 600_000;
         const startedAt = Date.now();
 
+        syncTimerRef.current = setInterval(() => {
+            setSyncElapsed(Math.floor((Date.now() - startedAt) / 1000));
+        }, 1000);
+
         syncPollRef.current = setInterval(async () => {
             if (Date.now() - startedAt > TIMEOUT_MS) {
-                clearInterval(syncPollRef.current);
-                setSyncingStock(false);
+                stopSync();
                 message.error('La sincronización tardó demasiado. Verifica el estado del demonio.');
                 return;
             }
             try {
                 const res = await comprasApi.getSyncStockStatus();
                 const status = res?.data?.data?.status;
-                if (status === 'done') {
-                    clearInterval(syncPollRef.current);
-                    setSyncingStock(false);
+                if (status === 'running') {
+                    setSyncPhase('running');
+                } else if (status === 'done') {
                     await refetchProductos();
-                    message.success('Stock actualizado correctamente.');
+                    stopSync(true);
                 } else if (status === 'error') {
-                    clearInterval(syncPollRef.current);
-                    setSyncingStock(false);
+                    stopSync();
                     message.error('El demonio reportó un error al sincronizar.');
                 }
             } catch {
-                clearInterval(syncPollRef.current);
-                setSyncingStock(false);
+                stopSync();
                 message.error('Error al consultar el estado de la sincronización.');
             }
         }, 3000);
-    }, [refetchProductos]);
+    }, [refetchProductos, stopSync]);
 
     useEffect(() => {
-        return () => clearInterval(syncPollRef.current);
+        return () => { clearInterval(syncPollRef.current); clearInterval(syncTimerRef.current); };
     }, []);
 
     // ── Aplicar sugerencias de la categoría activa ───────────────────────────
@@ -1556,15 +1572,24 @@ export default function Compras() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <Button
-                                                    icon={<ReloadOutlined />}
-                                                    loading={syncingStock}
-                                                    onClick={handleSyncStock}
-                                                    style={{ borderColor: '#370776', color: '#370776' }}
-                                                    size="small"
-                                                >
-                                                    {syncingStock ? 'Sincronizando...' : 'Sync stock'}
-                                                </Button>
+                                                <div className="flex flex-col items-center gap-0.5">
+                                                    <Button
+                                                        icon={<ReloadOutlined />}
+                                                        loading={syncingStock}
+                                                        onClick={handleSyncStock}
+                                                        style={{ borderColor: '#370776', color: '#370776' }}
+                                                        size="small"
+                                                    >
+                                                        {!syncingStock && 'Sync stock'}
+                                                        {syncPhase === 'enviando' && 'Enviando...'}
+                                                        {syncPhase === 'running' && `Sincronizando ${Math.floor(syncElapsed / 60)}:${String(syncElapsed % 60).padStart(2, '0')}`}
+                                                    </Button>
+                                                    {syncingStock && (
+                                                        <span className="text-[10px] text-gray-400">
+                                                            {syncPhase === 'enviando' ? 'Esperando demonio...' : `${syncElapsed}s transcurridos`}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <Button
                                                     icon={<ReloadOutlined />}
                                                     loading={actualizando}
