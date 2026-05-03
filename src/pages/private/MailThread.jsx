@@ -102,8 +102,8 @@ const MailThread = () => {
             return;
         }
 
-        if (cot.pdf) {
-            const pdfBlob = atob(cot.pdf);
+        if (cot) {
+            const pdfBlob = atob(cot);
             const array = new Uint8Array(pdfBlob.length);
             for (let i = 0; i < pdfBlob.length; i++) {
                 array[i] = pdfBlob.charCodeAt(i);
