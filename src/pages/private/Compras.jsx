@@ -1050,6 +1050,8 @@ export default function Compras() {
     const { confirmados, refetchConfirmados } = useConfirmados();
     const [activeTab, setActiveTab] = useState('nuevo');
     const [actualizando, setActualizando] = useState(false);
+    const [syncingStock, setSyncingStock] = useState(false);
+    const syncPollRef = useRef(null);
 
     // Estado local de la tabla
     const [filas, setFilas] = useState(null);
@@ -1145,6 +1147,56 @@ export default function Compras() {
                 setPedidoInfo(prev => prev[cod] ? prev : { ...prev, [cod]: productoRef });
             }
         }
+    }, []);
+
+    // ── Sync stock on-demand ─────────────────────────────────────────────────
+    const handleSyncStock = useCallback(async () => {
+        setSyncingStock(true);
+        try {
+            await comprasApi.triggerSyncStock();
+        } catch (err) {
+            if (err.response?.status === 409) {
+                message.info('Ya hay una sincronización en curso. Espera un momento.');
+            } else {
+                message.error('No se pudo iniciar la sincronización.');
+            }
+            setSyncingStock(false);
+            return;
+        }
+
+        const TIMEOUT_MS = 120_000;
+        const startedAt = Date.now();
+
+        syncPollRef.current = setInterval(async () => {
+            if (Date.now() - startedAt > TIMEOUT_MS) {
+                clearInterval(syncPollRef.current);
+                setSyncingStock(false);
+                message.error('La sincronización tardó demasiado. Verifica el estado del demonio.');
+                return;
+            }
+            try {
+                const res = await comprasApi.getSyncStockStatus();
+                const status = res?.data?.data?.status;
+                if (status === 'done') {
+                    clearInterval(syncPollRef.current);
+                    setSyncingStock(false);
+                    await refetchProductos();
+                    message.success('Stock actualizado correctamente.');
+                } else if (status === 'error') {
+                    clearInterval(syncPollRef.current);
+                    setSyncingStock(false);
+                    message.error('El demonio reportó un error al sincronizar.');
+                }
+            } catch {
+                clearInterval(syncPollRef.current);
+                setSyncingStock(false);
+                message.error('Error al consultar el estado de la sincronización.');
+            }
+        }, 3000);
+    }, [refetchProductos]);
+
+    useEffect(() => {
+        return () => clearInterval(syncPollRef.current);
     }, []);
 
     // ── Aplicar sugerencias de la categoría activa ───────────────────────────
@@ -1504,6 +1556,15 @@ export default function Compras() {
                                                         </div>
                                                     )}
                                                 </div>
+                                                <Button
+                                                    icon={<ReloadOutlined />}
+                                                    loading={syncingStock}
+                                                    onClick={handleSyncStock}
+                                                    style={{ borderColor: '#370776', color: '#370776' }}
+                                                    size="small"
+                                                >
+                                                    {syncingStock ? 'Sincronizando...' : 'Sync stock'}
+                                                </Button>
                                                 <Button
                                                     icon={<ReloadOutlined />}
                                                     loading={actualizando}
