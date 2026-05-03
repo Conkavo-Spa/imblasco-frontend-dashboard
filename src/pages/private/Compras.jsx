@@ -1568,7 +1568,7 @@ export default function Compras() {
                                                     <div className="text-xs text-gray-400">{statusLabel.sub}</div>
                                                     {actualizadoEl && (
                                                         <div className="text-xs text-gray-300 mt-0.5">
-                                                            datos: {new Date(actualizadoEl).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                            stock: {new Date(actualizadoEl).toLocaleString('es-CL', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                                         </div>
                                                     )}
                                                 </div>
