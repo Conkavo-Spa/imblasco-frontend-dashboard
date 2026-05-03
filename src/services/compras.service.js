@@ -10,6 +10,12 @@ class ComprasService {
     actualizar() {
         return instance.post('/compras/actualizar');
     }
+    triggerSyncStock() {
+        return instance.post('/sync/stock');
+    }
+    getSyncStockStatus() {
+        return instance.get('/sync/stock/status');
+    }
 }
 
 const comprasApi = new ComprasService();
