@@ -1572,22 +1572,56 @@ export default function Compras() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <div className="flex flex-col items-center gap-0.5">
+                                                <div style={{ minWidth: 170 }}>
+                                                    <style>{`
+                                                        @keyframes syncShimmer {
+                                                            0% { transform: translateX(-100%); }
+                                                            100% { transform: translateX(200%); }
+                                                        }
+                                                        @keyframes syncPulse {
+                                                            0%, 100% { opacity: 1; }
+                                                            50% { opacity: 0.5; }
+                                                        }
+                                                    `}</style>
                                                     <Button
                                                         icon={<ReloadOutlined />}
                                                         loading={syncingStock}
                                                         onClick={handleSyncStock}
-                                                        style={{ borderColor: '#370776', color: '#370776' }}
+                                                        style={{ borderColor: '#370776', color: '#370776', width: '100%' }}
                                                         size="small"
                                                     >
                                                         {!syncingStock && 'Sync stock'}
                                                         {syncPhase === 'enviando' && 'Enviando...'}
-                                                        {syncPhase === 'running' && `Sincronizando ${Math.floor(syncElapsed / 60)}:${String(syncElapsed % 60).padStart(2, '0')}`}
+                                                        {syncPhase === 'running' && (
+                                                            <span style={{ fontVariantNumeric: 'tabular-nums' }}>
+                                                                Sincronizando&nbsp;{Math.floor(syncElapsed / 60)}:{String(syncElapsed % 60).padStart(2, '0')}
+                                                            </span>
+                                                        )}
                                                     </Button>
                                                     {syncingStock && (
-                                                        <span className="text-[10px] text-gray-400">
-                                                            {syncPhase === 'enviando' ? 'Esperando demonio...' : `${syncElapsed}s transcurridos`}
-                                                        </span>
+                                                        <div style={{ marginTop: 6 }}>
+                                                            <div style={{ width: '100%', height: 4, background: 'rgba(55,7,118,0.1)', borderRadius: 999, overflow: 'hidden' }}>
+                                                                <div style={{
+                                                                    height: '100%',
+                                                                    width: `${syncPhase === 'enviando' ? 4 : Math.min((syncElapsed / 420) * 100, 94)}%`,
+                                                                    background: 'linear-gradient(90deg, #370776, #7c3aed)',
+                                                                    borderRadius: 999,
+                                                                    transition: 'width 1s linear',
+                                                                    position: 'relative',
+                                                                    overflow: 'hidden',
+                                                                    animation: syncPhase === 'enviando' ? 'syncPulse 1.2s ease-in-out infinite' : 'none',
+                                                                }}>
+                                                                    <div style={{
+                                                                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                                        background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.45) 50%, transparent 100%)',
+                                                                        animation: 'syncShimmer 1.6s ease-in-out infinite',
+                                                                    }} />
+                                                                </div>
+                                                            </div>
+                                                            <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 3, textAlign: 'center' }}>
+                                                                {syncPhase === 'enviando' ? 'Esperando al demonio...' : 'Actualizando stock en MongoDB...'}
+                                                            </div>
+                                                        </div>
                                                     )}
                                                 </div>
                                                 <Button
