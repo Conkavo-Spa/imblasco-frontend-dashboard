@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Table, Input, Button, Drawer, Tag, Spin, Badge, Tabs, Empty, Collapse, Modal, message, Pagination, Tooltip, Upload } from 'antd';
-import { ShoppingOutlined, CloseOutlined, DeleteOutlined, WarningOutlined, HistoryOutlined, DownloadOutlined, CheckCircleOutlined, ReloadOutlined, InboxOutlined } from '@ant-design/icons';
+import { ShoppingOutlined, CloseOutlined, DeleteOutlined, WarningOutlined, HistoryOutlined, DownloadOutlined, CheckCircleOutlined, ReloadOutlined, InboxOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import ExcelJS from 'exceljs';
 import Sidebar from '../../components/Sidebar';
 import { useCompras } from '../../hooks/useCompras';
@@ -44,7 +44,9 @@ async function exportarExcel(productos, fecha) {
     const a = document.createElement('a');
     a.href = url;
     a.download = `pedido_${fecha}.xlsx`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 
@@ -217,7 +219,7 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                                         {new Date(p.createdAt ?? p.fecha).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
                                     </span>
                                     <span className="text-xs text-gray-400">
-                                        {p.productos.length} productos · {p.totalUnidades.toLocaleString('es-CL')} uds.
+                                        {p.productos.length} productos · {(p.totalUnidades ?? 0).toLocaleString('es-CL')} uds.
                                     </span>
                                     {tieneDisputa    && <Tag color="warning">En disputa</Tag>}
                                     {tieneConfirm    && <Tag color="success">Confirmado</Tag>}
@@ -1118,6 +1120,37 @@ export default function Compras() {
         return base.filter(p => getCategoriaDeProducto(p) === categoriaSeleccionada);
     }, [searchQuery, searchResults, filas, categoriaSeleccionada]);
 
+    const [sortXEmbarcar, setSortXEmbarcar] = useState(false);
+    const [stockSort, setStockSort] = useState(null);      // null | 'desc' | 'asc'
+    const [sugerenciaSort, setSugerenciaSort] = useState(null); // null | 'desc' | 'asc'
+
+    const resetSorts = () => { setStockSort(null); setSugerenciaSort(null); setSortXEmbarcar(false); };
+
+    const filasOrdenadas = useMemo(() => {
+        if (stockSort) {
+            return [...filasFiltradas].sort((a, b) =>
+                stockSort === 'desc'
+                    ? (b.stock ?? 0) - (a.stock ?? 0)
+                    : (a.stock ?? 0) - (b.stock ?? 0)
+            );
+        }
+        if (sugerenciaSort) {
+            return [...filasFiltradas].sort((a, b) =>
+                sugerenciaSort === 'desc'
+                    ? (b.sugerencia ?? 0) - (a.sugerencia ?? 0)
+                    : (a.sugerencia ?? 0) - (b.sugerencia ?? 0)
+            );
+        }
+        if (sortXEmbarcar) {
+            return [...filasFiltradas].sort((a, b) => {
+                const ta = (a.porEmbarcar ?? 0) + (confirmados[a.cod] ?? 0);
+                const tb = (b.porEmbarcar ?? 0) + (confirmados[b.cod] ?? 0);
+                return tb - ta;
+            });
+        }
+        return filasFiltradas;
+    }, [filasFiltradas, sortXEmbarcar, stockSort, sugerenciaSort, confirmados]);
+
     // ── Navegar entre inputs con Enter ──────────────────────────────────────
     const handleQtyEnter = useCallback((e) => {
         if (e.key === 'Enter') {
@@ -1270,7 +1303,7 @@ export default function Compras() {
     // ── Aviso al cerrar/recargar pestaña con pedido sin exportar ────────────
     useEffect(() => {
         const handler = e => {
-            if (pedidoCods.length > 0) { e.preventDefault(); e.returnValue = ''; }
+            if (pedidoCods.some(cod => (aPedir[cod] ?? 0) > 0)) { e.preventDefault(); e.returnValue = ''; }
         };
         window.addEventListener('beforeunload', handler);
         return () => window.removeEventListener('beforeunload', handler);
@@ -1392,7 +1425,21 @@ export default function Compras() {
         },
         // ── Stock ─────────────────────────────────────────────────────────────
         {
-            title: 'Stock',
+            title: (
+                <div
+                    className="flex items-center justify-end gap-1 cursor-pointer select-none"
+                    onClick={() => {
+                        const next = stockSort === null ? 'desc' : stockSort === 'desc' ? 'asc' : null;
+                        resetSorts();
+                        setStockSort(next);
+                    }}
+                >
+                    <span>Stock</span>
+                    {stockSort === null && <span style={{ fontSize: 10, color: '#9ca3af' }}>↕</span>}
+                    {stockSort === 'desc' && <ArrowDownOutlined style={{ fontSize: 10, color: '#370776' }} />}
+                    {stockSort === 'asc'  && <ArrowUpOutlined  style={{ fontSize: 10, color: '#370776' }} />}
+                </div>
+            ),
             dataIndex: 'stock', key: 'stock', width: 100, align: 'right',
             render: val => (
                 <span className="text-sm font-semibold text-gray-700 tabular-nums">
@@ -1402,7 +1449,15 @@ export default function Compras() {
         },
         // ── X Embarcar y Embarcado ────────────────────────────────────────────
         {
-            title: 'X Embarcar',
+            title: (
+                <div
+                    className="flex items-center justify-end gap-1 cursor-pointer select-none"
+                    onClick={() => { const next = !sortXEmbarcar; resetSorts(); setSortXEmbarcar(next); }}
+                >
+                    <span>Por Embarcar</span>
+                    <ArrowUpOutlined style={{ fontSize: 10, color: sortXEmbarcar ? '#370776' : '#9ca3af' }} />
+                </div>
+            ),
             key: 'porEmbarcar', width: 92, align: 'right',
             render: (_, record) => {
                 const total = (record.porEmbarcar ?? 0) + (confirmados[record.cod] ?? 0);
@@ -1423,7 +1478,21 @@ export default function Compras() {
         },
         // ── Sugerencia ────────────────────────────────────────────────────────
         {
-            title: 'Sugerencia',
+            title: (
+                <div
+                    className="flex items-center justify-center gap-1 cursor-pointer select-none"
+                    onClick={() => {
+                        const next = sugerenciaSort === null ? 'desc' : sugerenciaSort === 'desc' ? 'asc' : null;
+                        resetSorts();
+                        setSugerenciaSort(next);
+                    }}
+                >
+                    <span>Sugerencia</span>
+                    {sugerenciaSort === null && <span style={{ fontSize: 10, color: '#9ca3af' }}>↕</span>}
+                    {sugerenciaSort === 'desc' && <ArrowDownOutlined style={{ fontSize: 10, color: '#370776' }} />}
+                    {sugerenciaSort === 'asc'  && <ArrowUpOutlined  style={{ fontSize: 10, color: '#370776' }} />}
+                </div>
+            ),
             dataIndex: 'sugerencia', key: 'sugerencia', width: 108, align: 'center',
             render: (val, record) => (
                 val > 0
@@ -1657,7 +1726,7 @@ export default function Compras() {
                                         <div className="overflow-x-auto">
                                             <Spin spinning={loading || searchLoading}>
                                                 <Table
-                                                    dataSource={filasFiltradas}
+                                                    dataSource={filasOrdenadas}
                                                     columns={columns}
                                                     rowKey="cod"
                                                     size="small"
