@@ -1,9 +1,20 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Badge, Button, Card, Checkbox, Empty, Input, List, Modal, Tag, Tooltip, Upload, message } from 'antd';
-import { ArrowLeftOutlined, EditOutlined, InfoCircleOutlined, MessageOutlined, PaperClipOutlined } from '@ant-design/icons';
+import { Button, Card, Checkbox, Empty, Input, List, Modal, Tag, Tooltip, message } from 'antd';
+import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import Sidebar from '../../components/Sidebar';
+import AiSuggestedReplyModal from '../../components/mail/AiSuggestedReplyModal';
+import ManualReplyModal from '../../components/mail/ManualReplyModal';
+import MailThreadMessageItem from '../../components/mail/MailThreadMessageItem';
 import EmailConversations from '../../services/EmailConversations';
+import {
+    getCotizacionBase64,
+    getLastAiReplyMessageId,
+    getPersistedAiSuggestedText,
+    mergeConversationFromApi,
+    shouldShowReplyChoiceActions,
+    shouldShowViewAiSuggestionButton,
+} from '../../utils/mailThread';
 
 const formatDate = (date) => {
     if (!date) return '—';
@@ -12,55 +23,6 @@ const formatDate = (date) => {
         dateStyle: 'short',
         timeStyle: 'short',
     });
-};
-
-/** Quita prefijo data:...;base64, y espacios que suelen venir en MIME/base64. */
-const normalizePdfBase64 = (raw) => {
-    if (!raw || typeof raw !== 'string') return '';
-    let s = raw.trim().replace(/\s/g, '');
-    const dataIdx = s.indexOf('base64,');
-    if (dataIdx !== -1) {
-        s = s.slice(dataIdx + 'base64,'.length);
-    }
-    return s;
-};
-
-/** PDF en base64 a nivel conversación o en algún mensaje (prioriza el último con dato). */
-const getCotizacionBase64 = (conv) => {
-    if (!conv) return null;
-    const fromRoot = normalizePdfBase64(conv.pdf_base64);
-    if (fromRoot) return fromRoot;
-    const msgs = [...(conv.messages || [])].sort(
-        (a, b) => new Date(a.sentAt || 0) - new Date(b.sentAt || 0)
-    );
-    for (let i = msgs.length - 1; i >= 0; i--) {
-        const piece = normalizePdfBase64(msgs[i]?.pdf_base64);
-        if (piece) return piece;
-    }
-    return null;
-};
-
-const isOutboundAiMessage = (m) => {
-    if (!m || m.direction !== 'outbound') return false;
-    const meta = m.metadata || {};
-    if (m.ai === true || m.isAi === true || m.fromAi === true) return true;
-    if (m.source === 'ai' || m.role === 'assistant') return true;
-    if (meta.ai === true || meta.source === 'ai' || meta.from === 'assistant') return true;
-    return false;
-};
-
-/** Último mensaje outbound marcado como IA; si el backend no marca IA, el último outbound del hilo. */
-const getLastAiReplyMessageId = (messagesSortedList) => {
-    if (!messagesSortedList?.length) return null;
-    for (let i = messagesSortedList.length - 1; i >= 0; i--) {
-        const m = messagesSortedList[i];
-        if (isOutboundAiMessage(m)) return String(m._id ?? '');
-    }
-    for (let i = messagesSortedList.length - 1; i >= 0; i--) {
-        const m = messagesSortedList[i];
-        if (m.direction === 'outbound') return String(m._id ?? '');
-    }
-    return null;
 };
 
 const MailThread = () => {
@@ -84,6 +46,9 @@ const MailThread = () => {
     const [replyBody, setReplyBody] = useState('');
     const [replyFileList, setReplyFileList] = useState([]);
     const [isSendingReply, setIsSendingReply] = useState(false);
+    const [isSendingSuggested, setIsSendingSuggested] = useState(false);
+    const [aiSuggestionModalOpen, setAiSuggestionModalOpen] = useState(false);
+    const [aiSuggestionModalText, setAiSuggestionModalText] = useState('');
 
     // Limpiar modales al desmontar
     useEffect(() => {
@@ -199,8 +164,40 @@ const MailThread = () => {
         [messagesSorted]
     );
 
-    const handleEnviarRespuestaSugerida = () => {
-        console.log('Enviar respuesta sugerida', conversation?._id);
+    const openAiSuggestionModal = (m) => {
+        setAiSuggestionModalText(getPersistedAiSuggestedText(m));
+        setAiSuggestionModalOpen(true);
+    };
+
+    const closeAiSuggestionModal = () => {
+        setAiSuggestionModalOpen(false);
+        setAiSuggestionModalText('');
+    };
+
+    const handleEnviarRespuestaSugerida = async () => {
+        setIsSendingSuggested(true);
+        try {
+            const resp = await EmailConversations.sendSuggestedReply(conversation._id);
+            const data = resp?.data;
+            if (data?.success === false) {
+                message.warning(data?.message || 'No se pudo enviar la respuesta sugerida');
+                return;
+            }
+            message.success(data?.message || 'Respuesta sugerida enviada');
+            setConversation((prev) => mergeConversationFromApi(prev, data));
+        } catch (err) {
+            if (err?.response?.status === 404) {
+                message.warning(
+                    'El servidor aún no implementa POST /emails/:id/reply/suggested.'
+                );
+            } else {
+                message.error(
+                    err?.response?.data?.message || err.message || 'Error al enviar la respuesta sugerida'
+                );
+            }
+        } finally {
+            setIsSendingSuggested(false);
+        }
     };
 
     const closeReplyModal = () => {
@@ -242,6 +239,7 @@ const MailThread = () => {
                 return;
             }
             message.success(data?.message || resp?.message || 'Respuesta enviada');
+            setConversation((prev) => mergeConversationFromApi(prev, data));
             closeReplyModal();
         } catch (err) {
             if (err?.response?.status === 404) {
@@ -437,69 +435,22 @@ const MailThread = () => {
                         dataSource={messagesSorted}
                         locale={{ emptyText: 'No hay mensajes' }}
                         renderItem={(m) => {
-                            const inbound = m.direction === 'inbound';
-                            const from = m.from?.email || m.from?.name || '—';
-                            const hasFeedback = Boolean(String(m.feedback || '').trim());
+                            const showChoice = shouldShowReplyChoiceActions(
+                                conversation,
+                                m,
+                                lastAiReplyMessageId
+                            );
                             return (
-                                <List.Item>
-                                    <div className="w-full">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-2">
-                                                {hasFeedback ? (
-                                                    <Badge dot color="#faad14">
-                                                        <Tag color={inbound ? 'blue' : 'green'}>
-                                                            {inbound ? 'Recibido' : 'Enviado'}
-                                                        </Tag>
-                                                    </Badge>
-                                                ) : (
-                                                    <Tag color={inbound ? 'blue' : 'green'}>
-                                                        {inbound ? 'Recibido' : 'Enviado'}
-                                                    </Tag>
-                                                )}
-                                                <span className="text-gray-800 text-sm">
-                                                    <b>De:</b> {from}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                {!inbound && (
-                                                    <Button
-                                                        size="small"
-                                                        icon={<EditOutlined />}
-                                                        onClick={() => {
-                                                            setSelectedMessageId(String(m._id));
-                                                            setFeedbackText(m.feedback || '');
-                                                            setIsFeedbackOpen(true);
-                                                        }}
-                                                    >
-                                                        Ajustar
-                                                    </Button>
-                                                )}
-                                                {hasFeedback && (
-                                                    <Button
-                                                        size="small"
-                                                        icon={<MessageOutlined />}
-                                                        onClick={() => {
-                                                            setSelectedMessageId(String(m._id));
-                                                            setFeedbackText(m.feedback || '');
-                                                            setIsFeedbackOpen(true);
-                                                        }}
-                                                    >
-                                                        Ver feedback
-                                                    </Button>
-                                                )}
-                                                <span className="text-gray-500 text-sm">
-                                                    {formatDate(m.sentAt)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="mt-2 whitespace-pre-wrap wrap-anywhere max-w-full text-gray-800">
-                                            {m.content?.text || '—'}
-                                        </div>
-                                        {lastAiReplyMessageId &&
-                                        String(m._id) === lastAiReplyMessageId ? (
-                                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <MailThreadMessageItem
+                                    message={m}
+                                    formatDate={formatDate}
+                                    showReplyChoiceRow={showChoice}
+                                    replyChoiceSlot={
+                                        showChoice ? (
+                                            <>
                                                 <Button
                                                     type="primary"
+                                                    loading={isSendingSuggested}
                                                     onClick={handleEnviarRespuestaSugerida}
                                                 >
                                                     Enviar respuesta sugerida
@@ -507,10 +458,22 @@ const MailThread = () => {
                                                 <Button onClick={handleResponderManualmente}>
                                                     Responder manualmente
                                                 </Button>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </List.Item>
+                                            </>
+                                        ) : null
+                                    }
+                                    showViewAiSuggestionButton={shouldShowViewAiSuggestionButton(m)}
+                                    onViewAiSuggestion={openAiSuggestionModal}
+                                    onOpenFeedbackAdjust={(msg) => {
+                                        setSelectedMessageId(String(msg._id));
+                                        setFeedbackText(msg.feedback || '');
+                                        setIsFeedbackOpen(true);
+                                    }}
+                                    onOpenFeedbackView={(msg) => {
+                                        setSelectedMessageId(String(msg._id));
+                                        setFeedbackText(msg.feedback || '');
+                                        setIsFeedbackOpen(true);
+                                    }}
+                                />
                             );
                         }}
                     />
@@ -534,44 +497,23 @@ const MailThread = () => {
                     ) : null}
                 </Modal>
 
-                <Modal
-                    title="Responder correo"
+                <ManualReplyModal
                     open={isReplyModalOpen}
                     onCancel={closeReplyModal}
-                    width={640}
-                    destroyOnClose
-                    footer={
-                        <div className="flex justify-end gap-2">
-                            <Button onClick={closeReplyModal}>Cancelar</Button>
-                            <Button type="primary" loading={isSendingReply} onClick={handleSendManualReply}>
-                                Enviar respuesta
-                            </Button>
-                        </div>
-                    }
-                >
-                    <div className="mb-3 text-sm text-gray-600">
-                        <span className="font-semibold text-gray-800">Para: </span>
-                        {conversation.participants?.customer?.email || '—'}
-                    </div>
-                    <Input.TextArea
-                        value={replyBody}
-                        onChange={(e) => setReplyBody(e.target.value)}
-                        placeholder="Escribí tu respuesta..."
-                        autoSize={{ minRows: 8, maxRows: 16 }}
-                        className="mb-4"
-                    />
-                    <Upload
-                        fileList={replyFileList}
-                        beforeUpload={() => false}
-                        onChange={handleReplyUploadChange}
-                        multiple
-                    >
-                        <Button icon={<PaperClipOutlined />}>Adjuntar archivos</Button>
-                    </Upload>
-                    <p className="mt-2 text-xs text-gray-500">
-                        Los adjuntos se envían junto al texto cuando el backend reciba el envío.
-                    </p>
-                </Modal>
+                    customerEmail={conversation.participants?.customer?.email}
+                    replyBody={replyBody}
+                    onReplyBodyChange={setReplyBody}
+                    replyFileList={replyFileList}
+                    onReplyUploadChange={handleReplyUploadChange}
+                    onSend={handleSendManualReply}
+                    sending={isSendingReply}
+                />
+
+                <AiSuggestedReplyModal
+                    open={aiSuggestionModalOpen}
+                    onCancel={closeAiSuggestionModal}
+                    suggestedText={aiSuggestionModalText}
+                />
 
                 <Modal
                     title="Ajustar"
