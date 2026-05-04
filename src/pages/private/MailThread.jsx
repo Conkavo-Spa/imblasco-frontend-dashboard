@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Badge, Button, Card, Checkbox, Empty, Input, List, Modal, Tag, Tooltip, message } from 'antd';
-import { ArrowLeftOutlined, EditOutlined, InfoCircleOutlined, MessageOutlined } from '@ant-design/icons';
+import { Badge, Button, Card, Checkbox, Empty, Input, List, Modal, Tag, Tooltip, Upload, message } from 'antd';
+import { ArrowLeftOutlined, EditOutlined, InfoCircleOutlined, MessageOutlined, PaperClipOutlined } from '@ant-design/icons';
 import Sidebar from '../../components/Sidebar';
 import EmailConversations from '../../services/EmailConversations';
 
@@ -40,6 +40,29 @@ const getCotizacionBase64 = (conv) => {
     return null;
 };
 
+const isOutboundAiMessage = (m) => {
+    if (!m || m.direction !== 'outbound') return false;
+    const meta = m.metadata || {};
+    if (m.ai === true || m.isAi === true || m.fromAi === true) return true;
+    if (m.source === 'ai' || m.role === 'assistant') return true;
+    if (meta.ai === true || meta.source === 'ai' || meta.from === 'assistant') return true;
+    return false;
+};
+
+/** Último mensaje outbound marcado como IA; si el backend no marca IA, el último outbound del hilo. */
+const getLastAiReplyMessageId = (messagesSortedList) => {
+    if (!messagesSortedList?.length) return null;
+    for (let i = messagesSortedList.length - 1; i >= 0; i--) {
+        const m = messagesSortedList[i];
+        if (isOutboundAiMessage(m)) return String(m._id ?? '');
+    }
+    for (let i = messagesSortedList.length - 1; i >= 0; i--) {
+        const m = messagesSortedList[i];
+        if (m.direction === 'outbound') return String(m._id ?? '');
+    }
+    return null;
+};
+
 const MailThread = () => {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -57,6 +80,10 @@ const MailThread = () => {
     const [isCorrectedDisabled, setIsCorrectedDisabled] = useState(false);
     const [openCotizacionModal, setOpenCotizacionModal] = useState(false);
     const [cotizacionPdfUrl, setCotizacionPdfUrl] = useState(null);
+    const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
+    const [replyBody, setReplyBody] = useState('');
+    const [replyFileList, setReplyFileList] = useState([]);
+    const [isSendingReply, setIsSendingReply] = useState(false);
 
     // Limpiar modales al desmontar
     useEffect(() => {
@@ -167,6 +194,68 @@ const MailThread = () => {
         [conversation]
     );
 
+    const lastAiReplyMessageId = useMemo(
+        () => getLastAiReplyMessageId(messagesSorted),
+        [messagesSorted]
+    );
+
+    const handleEnviarRespuestaSugerida = () => {
+        console.log('Enviar respuesta sugerida', conversation?._id);
+    };
+
+    const closeReplyModal = () => {
+        setIsReplyModalOpen(false);
+        setReplyBody('');
+        setReplyFileList([]);
+    };
+
+    const handleResponderManualmente = () => {
+        setReplyBody('');
+        setReplyFileList([]);
+        setIsReplyModalOpen(true);
+    };
+
+    const handleReplyUploadChange = ({ fileList }) => {
+        setReplyFileList(fileList);
+    };
+
+    const handleSendManualReply = async () => {
+        const text = String(replyBody || '').trim();
+        if (!text && replyFileList.length === 0) {
+            message.warning('Escribí el cuerpo del correo o adjuntá al menos un archivo.');
+            return;
+        }
+        setIsSendingReply(true);
+        try {
+            const fd = new FormData();
+            fd.append('text', text);
+            replyFileList.forEach((item) => {
+                const file = item.originFileObj ?? item;
+                if (file instanceof File) {
+                    fd.append('attachments', file);
+                }
+            });
+            const resp = await EmailConversations.sendManualReply(conversation._id, fd);
+            const data = resp?.data;
+            if (data?.success === false) {
+                message.warning(data?.message || 'No se pudo enviar la respuesta');
+                return;
+            }
+            message.success(data?.message || resp?.message || 'Respuesta enviada');
+            closeReplyModal();
+        } catch (err) {
+            if (err?.response?.status === 404) {
+                message.warning(
+                    'El servidor aún no implementa POST /emails/:id/reply. Cuando esté listo, el envío funcionará desde aquí.'
+                );
+            } else {
+                message.error(err?.response?.data?.message || err.message || 'Error al enviar la respuesta');
+            }
+        } finally {
+            setIsSendingReply(false);
+        }
+    };
+
     if (!conversation) {
         return (
             <div className="flex h-screen bg-[#f6f2ff] overflow-hidden">
@@ -267,10 +356,7 @@ const MailThread = () => {
                                         backgroundColor: '#52c41a',
                                         borderColor: '#52c41a'
                                     }}
-                                    onClick={() => {
-                                        console.log("Responder clic");
-                                        // aquí luego conectas tu lógica real
-                                    }}
+                                    onClick={handleResponderManualmente}
                                 >
                                     Responder
                                 </Button>
@@ -409,6 +495,20 @@ const MailThread = () => {
                                         <div className="mt-2 whitespace-pre-wrap wrap-anywhere max-w-full text-gray-800">
                                             {m.content?.text || '—'}
                                         </div>
+                                        {lastAiReplyMessageId &&
+                                        String(m._id) === lastAiReplyMessageId ? (
+                                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                <Button
+                                                    type="primary"
+                                                    onClick={handleEnviarRespuestaSugerida}
+                                                >
+                                                    Enviar respuesta sugerida
+                                                </Button>
+                                                <Button onClick={handleResponderManualmente}>
+                                                    Responder manualmente
+                                                </Button>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 </List.Item>
                             );
@@ -432,6 +532,45 @@ const MailThread = () => {
                             className="w-full h-full min-h-[70vh] border-0"
                         />
                     ) : null}
+                </Modal>
+
+                <Modal
+                    title="Responder correo"
+                    open={isReplyModalOpen}
+                    onCancel={closeReplyModal}
+                    width={640}
+                    destroyOnClose
+                    footer={
+                        <div className="flex justify-end gap-2">
+                            <Button onClick={closeReplyModal}>Cancelar</Button>
+                            <Button type="primary" loading={isSendingReply} onClick={handleSendManualReply}>
+                                Enviar respuesta
+                            </Button>
+                        </div>
+                    }
+                >
+                    <div className="mb-3 text-sm text-gray-600">
+                        <span className="font-semibold text-gray-800">Para: </span>
+                        {conversation.participants?.customer?.email || '—'}
+                    </div>
+                    <Input.TextArea
+                        value={replyBody}
+                        onChange={(e) => setReplyBody(e.target.value)}
+                        placeholder="Escribí tu respuesta..."
+                        autoSize={{ minRows: 8, maxRows: 16 }}
+                        className="mb-4"
+                    />
+                    <Upload
+                        fileList={replyFileList}
+                        beforeUpload={() => false}
+                        onChange={handleReplyUploadChange}
+                        multiple
+                    >
+                        <Button icon={<PaperClipOutlined />}>Adjuntar archivos</Button>
+                    </Upload>
+                    <p className="mt-2 text-xs text-gray-500">
+                        Los adjuntos se envían junto al texto cuando el backend reciba el envío.
+                    </p>
                 </Modal>
 
                 <Modal
