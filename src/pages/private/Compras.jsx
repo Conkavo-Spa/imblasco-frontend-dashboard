@@ -348,6 +348,7 @@ function getCategoriaDeProducto(p) {
 
 const CATEGORIAS = [
     { key: 'todos',         label: 'Todos' },
+    { key: 'masVendidos',   label: 'Más vendidos' },
     { key: 'trofeos',       label: 'Trofeos y Premios' },
     { key: 'publicitarios', label: 'Artículos Publicitarios' },
     { key: 'pesca',         label: 'Pesca' },
@@ -1083,6 +1084,7 @@ export default function Compras() {
 
     // Drawer
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const [drawerSearch, setDrawerSearch] = useState('');
 
     // ── Búsqueda con debounce ────────────────────────────────────────────────
     useEffect(() => {
@@ -1104,8 +1106,9 @@ export default function Compras() {
 
     // ── Conteo por categoría (sobre la lista base, sin filtro de búsqueda) ──
     const countsPorCategoria = useMemo(() => {
-        const counts = { todos: 0, trofeos: 0, publicitarios: 0, pesca: 0, timbres: 0, otros: 0 };
-        (filas ?? []).forEach(p => {
+        const base = filas ?? [];
+        const counts = { todos: 0, masVendidos: Math.min(50, base.length), trofeos: 0, publicitarios: 0, pesca: 0, timbres: 0, otros: 0 };
+        base.forEach(p => {
             counts.todos++;
             const cat = getCategoriaDeProducto(p);
             if (counts[cat] !== undefined) counts[cat]++;
@@ -1117,12 +1120,22 @@ export default function Compras() {
     const filasFiltradas = useMemo(() => {
         const base = searchQuery.trim() ? searchResults : (filas ?? []);
         if (categoriaSeleccionada === 'todos') return base;
+        if (categoriaSeleccionada === 'masVendidos') {
+            return [...base]
+                .sort((a, b) => {
+                    const tA = (a[`y${CY-3}`] ?? 0) + (a[`y${CY-2}`] ?? 0) + (a[`y${CY-1}`] ?? 0) + (a[`y${CY}`] ?? 0);
+                    const tB = (b[`y${CY-3}`] ?? 0) + (b[`y${CY-2}`] ?? 0) + (b[`y${CY-1}`] ?? 0) + (b[`y${CY}`] ?? 0);
+                    return tB - tA;
+                })
+                .slice(0, 50);
+        }
         return base.filter(p => getCategoriaDeProducto(p) === categoriaSeleccionada);
     }, [searchQuery, searchResults, filas, categoriaSeleccionada]);
 
     const [sortXEmbarcar, setSortXEmbarcar] = useState(false);
     const [stockSort, setStockSort] = useState(null);      // null | 'desc' | 'asc'
     const [sugerenciaSort, setSugerenciaSort] = useState(null); // null | 'desc' | 'asc'
+    const [soloEnCarrito, setSoloEnCarrito] = useState(false);
 
     const resetSorts = () => { setStockSort(null); setSugerenciaSort(null); setSortXEmbarcar(false); };
 
@@ -1151,6 +1164,11 @@ export default function Compras() {
         return filasFiltradas;
     }, [filasFiltradas, sortXEmbarcar, stockSort, sugerenciaSort, confirmados]);
 
+    const filasVisibles = useMemo(() => {
+        if (!soloEnCarrito) return filasOrdenadas;
+        return filasOrdenadas.filter(p => (aPedir[p.cod] ?? 0) > 0);
+    }, [filasOrdenadas, soloEnCarrito, aPedir]);
+
     // ── Navegar entre inputs con Enter ──────────────────────────────────────
     const handleQtyEnter = useCallback((e) => {
         if (e.key === 'Enter') {
@@ -1165,6 +1183,7 @@ export default function Compras() {
         setPedidoCods([]);
         setPedidoInfo({});
         setAPedir({});
+        setSoloEnCarrito(false);
     }, []);
 
     // ── Handlers ─────────────────────────────────────────────────────────────
@@ -1243,16 +1262,36 @@ export default function Compras() {
         return () => { clearInterval(syncPollRef.current); clearInterval(syncTimerRef.current); };
     }, []);
 
-    // ── Aplicar sugerencias de la categoría activa ───────────────────────────
+    // ── Aplicar/quitar sugerencias de la categoría activa ───────────────────
+    const fuenteSugerencias = useMemo(
+        () => filasFiltradas.filter(p => (p.sugerencia ?? 0) > 0 && !p.descartado),
+        [filasFiltradas]
+    );
+
+    const sugerenciasAplicadas = useMemo(
+        () => fuenteSugerencias.length > 0 && fuenteSugerencias.every(p => (aPedir[p.cod] ?? 0) === p.sugerencia),
+        [fuenteSugerencias, aPedir]
+    );
+
     const aplicarSugerenciasCategoria = useCallback(() => {
-        const fuente = filasFiltradas.filter(p => (p.sugerencia ?? 0) > 0 && !p.descartado);
-        if (fuente.length === 0) return;
+        if (fuenteSugerencias.length === 0) return;
+
+        if (sugerenciasAplicadas) {
+            const codsAQuitar = new Set(fuenteSugerencias.map(p => p.cod));
+            setAPedir(prev => {
+                const next = { ...prev };
+                codsAQuitar.forEach(cod => { next[cod] = 0; });
+                return next;
+            });
+            setPedidoCods(prev => prev.filter(cod => !codsAQuitar.has(cod)));
+            return;
+        }
 
         const ejecutar = () => {
             const nuevosAPedir = {};
             const nuevosCods   = [];
             const nuevaInfo    = {};
-            fuente.forEach(p => {
+            fuenteSugerencias.forEach(p => {
                 nuevosAPedir[p.cod] = p.sugerencia;
                 nuevosCods.push(p.cod);
                 nuevaInfo[p.cod] = p;
@@ -1262,11 +1301,10 @@ export default function Compras() {
             setPedidoInfo(prev => ({ ...prev, ...nuevaInfo }));
         };
 
-        // Si está en "Todos", confirmar antes de aplicar masivamente
-        if (categoriaSeleccionada === 'todos') {
+        if (categoriaSeleccionada === 'todos' || categoriaSeleccionada === 'masVendidos') {
             Modal.confirm({
                 title: 'Aplicar todas las sugerencias',
-                content: `Se llenarán los campos "A pedir" de los ${fuente.length} productos visibles con sus sugerencias.`,
+                content: `Se llenarán los campos "A pedir" de los ${fuenteSugerencias.length} productos visibles con sus sugerencias.`,
                 okText: 'Aplicar todo',
                 cancelText: 'Cancelar',
                 okButtonProps: { style: { background: '#370776', borderColor: '#370776' } },
@@ -1275,7 +1313,7 @@ export default function Compras() {
         } else {
             ejecutar();
         }
-    }, [filasFiltradas, categoriaSeleccionada]);
+    }, [fuenteSugerencias, sugerenciasAplicadas, categoriaSeleccionada]);
 
     // ── Actualizar datos desde el ERP ────────────────────────────────────────
     const handleActualizar = useCallback(() => {
@@ -1318,10 +1356,24 @@ export default function Compras() {
         if (exportables.length === 0) return;
 
         const totalUds = exportables.reduce((s, p) => s + aPedir[p.cod], 0);
+        let limpiarAlExportar = true;
 
         Modal.confirm({
             title: 'Confirmar pedido',
-            content: `Se exportarán ${exportables.length} producto${exportables.length !== 1 ? 's' : ''} con ${totalUds.toLocaleString('es-CL')} unidades en total. El pedido quedará guardado en el historial.`,
+            content: (
+                <div>
+                    <p>Se exportarán {exportables.length} producto{exportables.length !== 1 ? 's' : ''} con {totalUds.toLocaleString('es-CL')} unidades en total. El pedido quedará guardado en el historial.</p>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, cursor: 'pointer', userSelect: 'none' }}>
+                        <input
+                            type="checkbox"
+                            defaultChecked
+                            onChange={e => { limpiarAlExportar = e.target.checked; }}
+                            style={{ accentColor: '#370776', width: 14, height: 14 }}
+                        />
+                        <span style={{ fontSize: 13 }}>Limpiar pedido después de exportar</span>
+                    </label>
+                </div>
+            ),
             okText: 'Confirmar y exportar',
             cancelText: 'Revisar',
             okButtonProps: { style: { background: '#370776', borderColor: '#370776' } },
@@ -1350,17 +1402,10 @@ export default function Compras() {
                     message.warning('El pedido se exportó pero no se pudo guardar en el historial.');
                 }
 
-                // Preguntar si limpiar el pedido actual
-                Modal.confirm({
-                    title: 'Pedido exportado',
-                    content: '¿Deseas limpiar el pedido actual para comenzar uno nuevo?',
-                    okText: 'Sí, limpiar',
-                    cancelText: 'Mantener',
-                    onOk: () => {
-                        limpiarPedido();
-                        setDrawerOpen(false);
-                    },
-                });
+                if (limpiarAlExportar) {
+                    limpiarPedido();
+                    setDrawerOpen(false);
+                }
             },
         });
     }, [pedidoCods, pedidoInfo, aPedir, refetchPedidos, limpiarPedido]);
@@ -1528,7 +1573,18 @@ export default function Compras() {
         },
     ];
 
-    const productosConCantidad = pedidoCods.map(cod => pedidoInfo[cod]).filter(p => p && (aPedir[p.cod] ?? 0) > 0);
+    const productosConCantidad = useMemo(
+        () => pedidoCods.map(cod => pedidoInfo[cod]).filter(p => p && (aPedir[p.cod] ?? 0) > 0),
+        [pedidoCods, pedidoInfo, aPedir]
+    );
+
+    const productosDrawerFiltrados = useMemo(() => {
+        const q = drawerSearch.trim().toLowerCase();
+        if (!q) return productosConCantidad;
+        return productosConCantidad.filter(p =>
+            p.nombre.toLowerCase().includes(q) || p.cod.toLowerCase().includes(q)
+        );
+    }, [productosConCantidad, drawerSearch]);
 
     const statusLabel = useMemo(() => {
         if (searchQuery.trim()) {
@@ -1559,21 +1615,6 @@ export default function Compras() {
                     {activeTab === 'nuevo' && (
                         <div className="flex flex-col items-end gap-1">
                             <div className="flex items-center gap-2">
-                                {pedidoCods.length > 0 && (
-                                    <Button
-                                        icon={<CloseOutlined />}
-                                        onClick={() => Modal.confirm({
-                                            title: 'Limpiar pedido',
-                                            content: 'Se quitarán todos los productos del pedido actual.',
-                                            okText: 'Limpiar',
-                                            cancelText: 'Cancelar',
-                                            okButtonProps: { danger: true },
-                                            onOk: limpiarPedido,
-                                        })}
-                                    >
-                                        Limpiar
-                                    </Button>
-                                )}
                                 <Badge count={productosConCantidad.length} color="#370776" offset={[-4, 4]}>
                                     <Button
                                         type="primary"
@@ -1617,12 +1658,20 @@ export default function Compras() {
                                             {!searchQuery.trim() && (
                                                 <Button
                                                     onClick={aplicarSugerenciasCategoria}
-                                                    disabled={loading || filasFiltradas.length === 0}
-                                                    style={{ borderColor: '#370776', color: '#370776' }}
+                                                    disabled={loading || fuenteSugerencias.length === 0}
+                                                    type={sugerenciasAplicadas ? 'primary' : 'default'}
+                                                    style={sugerenciasAplicadas
+                                                        ? { background: '#370776', borderColor: '#370776' }
+                                                        : { borderColor: '#370776', color: '#370776' }
+                                                    }
                                                 >
-                                                    {categoriaSeleccionada === 'todos'
-                                                        ? 'Aplicar todas las sugerencias'
-                                                        : `Aplicar sugerencias — ${CATEGORIAS.find(c => c.key === categoriaSeleccionada)?.label}`
+                                                    {sugerenciasAplicadas
+                                                        ? (categoriaSeleccionada === 'todos' || categoriaSeleccionada === 'masVendidos'
+                                                            ? 'Quitar todas las sugerencias'
+                                                            : `Quitar sugerencias — ${CATEGORIAS.find(c => c.key === categoriaSeleccionada)?.label}`)
+                                                        : (categoriaSeleccionada === 'todos' || categoriaSeleccionada === 'masVendidos'
+                                                            ? 'Aplicar todas las sugerencias'
+                                                            : `Aplicar sugerencias — ${CATEGORIAS.find(c => c.key === categoriaSeleccionada)?.label}`)
                                                     }
                                                 </Button>
                                             )}
@@ -1721,12 +1770,29 @@ export default function Compras() {
                                                     </button>
                                                 );
                                             })}
+                                            <div className="w-px h-4 bg-gray-200 mx-1 shrink-0" />
+                                            <button
+                                                onClick={() => setSoloEnCarrito(v => !v)}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all
+                                                    ${soloEnCarrito
+                                                        ? 'bg-[#370776] !text-white border-[#370776]'
+                                                        : 'bg-white text-gray-500 border-gray-200 hover:border-[#370776] hover:text-[#370776]'
+                                                    }`}
+                                            >
+                                                <ShoppingOutlined />
+                                                En carrito
+                                                {productosConCantidad.length > 0 && (
+                                                    <span className={`tabular-nums ${soloEnCarrito ? '!text-white/70' : 'text-gray-400'}`}>
+                                                        {productosConCantidad.length}
+                                                    </span>
+                                                )}
+                                            </button>
                                         </div>
 
                                         <div className="overflow-x-auto">
                                             <Spin spinning={loading || searchLoading}>
                                                 <Table
-                                                    dataSource={filasOrdenadas}
+                                                    dataSource={filasVisibles}
                                                     columns={columns}
                                                     rowKey="cod"
                                                     size="small"
@@ -1784,7 +1850,7 @@ export default function Compras() {
                 placement="right"
                 width={500}
                 open={drawerOpen}
-                onClose={() => setDrawerOpen(false)}
+                onClose={() => { setDrawerOpen(false); setDrawerSearch(''); }}
                 closeIcon={<CloseOutlined />}
                 footer={
                     <div className="flex flex-col gap-3">
@@ -1808,6 +1874,23 @@ export default function Compras() {
                         >
                             Exportar Excel
                         </Button>
+                        {productosConCantidad.length > 0 && (
+                            <Button
+                                block
+                                danger
+                                icon={<DeleteOutlined />}
+                                onClick={() => Modal.confirm({
+                                    title: 'Vaciar pedido',
+                                    content: 'Se quitarán todos los productos del pedido actual.',
+                                    okText: 'Vaciar',
+                                    cancelText: 'Cancelar',
+                                    okButtonProps: { danger: true },
+                                    onOk: () => { limpiarPedido(); setDrawerOpen(false); },
+                                })}
+                            >
+                                Vaciar pedido
+                            </Button>
+                        )}
                     </div>
                 }
             >
@@ -1816,8 +1899,19 @@ export default function Compras() {
                         No hay productos con cantidad asignada.
                     </div>
                 ) : (
-                    <div className="flex flex-col gap-2">
-                        {productosConCantidad.map(p => (
+                    <div className="flex flex-col gap-3">
+                        <Search
+                            placeholder="Buscar por nombre o código..."
+                            allowClear
+                            value={drawerSearch}
+                            onChange={e => setDrawerSearch(e.target.value)}
+                            size="small"
+                        />
+                        {productosDrawerFiltrados.length === 0 && (
+                            <div className="text-center text-sm text-gray-400 py-6">Sin resultados.</div>
+                        )}
+                        <div className="flex flex-col gap-2">
+                        {productosDrawerFiltrados.map(p => (
                             <div
                                 key={p.cod}
                                 className="flex items-center gap-3 rounded-lg px-4 py-3 border bg-gray-50 border-gray-200"
@@ -1846,6 +1940,7 @@ export default function Compras() {
                                 </button>
                             </div>
                         ))}
+                        </div>
                     </div>
                 )}
             </Drawer>
