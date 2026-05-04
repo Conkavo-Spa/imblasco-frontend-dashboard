@@ -14,6 +14,32 @@ const formatDate = (date) => {
     });
 };
 
+/** Quita prefijo data:...;base64, y espacios que suelen venir en MIME/base64. */
+const normalizePdfBase64 = (raw) => {
+    if (!raw || typeof raw !== 'string') return '';
+    let s = raw.trim().replace(/\s/g, '');
+    const dataIdx = s.indexOf('base64,');
+    if (dataIdx !== -1) {
+        s = s.slice(dataIdx + 'base64,'.length);
+    }
+    return s;
+};
+
+/** PDF en base64 a nivel conversación o en algún mensaje (prioriza el último con dato). */
+const getCotizacionBase64 = (conv) => {
+    if (!conv) return null;
+    const fromRoot = normalizePdfBase64(conv.pdf_base64);
+    if (fromRoot) return fromRoot;
+    const msgs = [...(conv.messages || [])].sort(
+        (a, b) => new Date(a.sentAt || 0) - new Date(b.sentAt || 0)
+    );
+    for (let i = msgs.length - 1; i >= 0; i--) {
+        const piece = normalizePdfBase64(msgs[i]?.pdf_base64);
+        if (piece) return piece;
+    }
+    return null;
+};
+
 const MailThread = () => {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -38,7 +64,9 @@ const MailThread = () => {
             try {
                 Modal.destroyAll();
                 document.body.classList.remove('ant-modal-open');
-            } catch (_) {}
+            } catch {
+                /* noop */
+            }
         };
     }, []);
 
@@ -51,7 +79,9 @@ const MailThread = () => {
                 navigate(`/mails?page=${qp}`, { replace: true });
                 return;
             }
-        } catch (_) {}
+        } catch {
+            /* noop */
+        }
         navigate('/mails', { replace: true });
     };
 
@@ -94,34 +124,48 @@ const MailThread = () => {
     };
 
     const handleVerCotizacion = () => {
-        //const cot = conversation?.cotizacion;
-        const cot = conversation?.pdf_base64;
+        const cot = getCotizacionBase64(conversation);
 
         if (!cot) {
-            message.warning("No hay cotización disponible");
+            message.warning('No hay cotización disponible');
             return;
         }
 
-        if (cot) {
-            const pdfBlob = atob(cot);
-            const array = new Uint8Array(pdfBlob.length);
-            for (let i = 0; i < pdfBlob.length; i++) {
-                array[i] = pdfBlob.charCodeAt(i);
+        try {
+            const binary = atob(cot);
+            const array = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                array[i] = binary.charCodeAt(i);
             }
-
-            const blob = new Blob([array], { type: "application/pdf" });
+            const blob = new Blob([array], { type: 'application/pdf' });
             const url = URL.createObjectURL(blob);
-
-            setCotizacionPdfUrl(url);
+            setCotizacionPdfUrl((prev) => {
+                if (prev) URL.revokeObjectURL(prev);
+                return url;
+            });
+            setOpenCotizacionModal(true);
+        } catch {
+            message.error('No se pudo leer el PDF (Base64 inválido).');
         }
+    };
 
-        setOpenCotizacionModal(true);
+    const closeCotizacionModal = () => {
+        setOpenCotizacionModal(false);
+        setCotizacionPdfUrl((prev) => {
+            if (prev) URL.revokeObjectURL(prev);
+            return null;
+        });
     };
 
     const messagesSorted = useMemo(() => {
         const msgs = conversation?.messages || [];
         return [...msgs].sort((a, b) => new Date(a.sentAt) - new Date(b.sentAt));
     }, [conversation]);
+
+    const hasCotizacionPdf = useMemo(
+        () => Boolean(getCotizacionBase64(conversation)),
+        [conversation]
+    );
 
     if (!conversation) {
         return (
@@ -211,6 +255,7 @@ const MailThread = () => {
                                     type="default"
                                     size="middle"
                                     onClick={handleVerCotizacion}
+                                    disabled={!hasCotizacionPdf}
                                 >
                                     Ver Cotización
                                 </Button>
@@ -372,8 +417,26 @@ const MailThread = () => {
                 </Card>
 
                 <Modal
-                    title="Ajustar"
+                    title="Cotización"
                     open={openCotizacionModal}
+                    onCancel={closeCotizacionModal}
+                    footer={null}
+                    width="min(96vw, 960px)"
+                    styles={{ body: { padding: 0, height: '75vh' } }}
+                    destroyOnClose
+                >
+                    {cotizacionPdfUrl ? (
+                        <iframe
+                            title="Cotización PDF"
+                            src={cotizacionPdfUrl}
+                            className="w-full h-full min-h-[70vh] border-0"
+                        />
+                    ) : null}
+                </Modal>
+
+                <Modal
+                    title="Ajustar"
+                    open={isFeedbackOpen}
                     onCancel={() => setIsFeedbackOpen(false)}
                     okText="Guardar"
                     cancelText="Cancelar"
