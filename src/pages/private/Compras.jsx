@@ -1055,7 +1055,6 @@ export default function Compras() {
     const [syncElapsed, setSyncElapsed] = useState(0);
     const syncPollRef = useRef(null);
     const syncTimerRef = useRef(null);
-    const runningStartedRef = useRef(null);
 
     // Estado local de la tabla
     const [filas, setFilas] = useState(null);
@@ -1157,7 +1156,6 @@ export default function Compras() {
     const stopSync = useCallback((success = false) => {
         clearInterval(syncPollRef.current);
         clearInterval(syncTimerRef.current);
-        runningStartedRef.current = null;
         setSyncingStock(false);
         setSyncPhase(null);
         setSyncElapsed(0);
@@ -1181,7 +1179,7 @@ export default function Compras() {
             return;
         }
 
-        const TIMEOUT_MS = 180_000;
+        const TIMEOUT_MS = 600_000;
         const startedAt = Date.now();
 
         syncTimerRef.current = setInterval(() => {
@@ -1198,12 +1196,6 @@ export default function Compras() {
                 const res = await comprasApi.getSyncStockStatus();
                 const status = res?.data?.data?.status;
                 if (status === 'running') {
-                    if (!runningStartedRef.current) runningStartedRef.current = Date.now();
-                    if (Date.now() - runningStartedRef.current > 90_000) {
-                        stopSync();
-                        message.error('El demonio está tardando demasiado. Verifica que esté corriendo correctamente.');
-                        return;
-                    }
                     setSyncPhase('running');
                 } else if (status === 'done') {
                     stopSync(true);
