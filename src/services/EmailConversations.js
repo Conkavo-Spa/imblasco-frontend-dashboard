@@ -17,14 +17,6 @@ class EmailConversationsService {
 
     setConversationCorrected = (conversationId, isCorrected) =>
         instance.put(`/emails/${conversationId}/corrected`, { isCorrected: isCorrected === true });
-
-    /** Respuesta manual con texto y adjuntos (multipart). El backend debe exponer este POST. */
-    sendManualReply = (conversationId, formData) =>
-        instance.post(`/emails/${conversationId}/reply`, formData);
-
-    /** Envía al cliente la respuesta sugerida por la IA (sin borrar la sugerida en BD). */
-    sendSuggestedReply = (conversationId) =>
-        instance.post(`/emails/${conversationId}/reply/suggested`, {});
 }
 
 const EmailConversations = new EmailConversationsService();

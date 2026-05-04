@@ -4,15 +4,11 @@ import { Button, Card, Checkbox, Empty, Input, List, Modal, Tag, Tooltip, messag
 import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import Sidebar from '../../components/Sidebar';
 import AiSuggestedReplyModal from '../../components/mail/AiSuggestedReplyModal';
-import ManualReplyModal from '../../components/mail/ManualReplyModal';
 import MailThreadMessageItem from '../../components/mail/MailThreadMessageItem';
 import EmailConversations from '../../services/EmailConversations';
 import {
     getCotizacionBase64,
-    getLastAiReplyMessageId,
     getPersistedAiSuggestedText,
-    mergeConversationFromApi,
-    shouldShowReplyChoiceActions,
     shouldShowViewAiSuggestionButton,
 } from '../../utils/mailThread';
 
@@ -42,11 +38,6 @@ const MailThread = () => {
     const [isCorrectedDisabled, setIsCorrectedDisabled] = useState(false);
     const [openCotizacionModal, setOpenCotizacionModal] = useState(false);
     const [cotizacionPdfUrl, setCotizacionPdfUrl] = useState(null);
-    const [isReplyModalOpen, setIsReplyModalOpen] = useState(false);
-    const [replyBody, setReplyBody] = useState('');
-    const [replyFileList, setReplyFileList] = useState([]);
-    const [isSendingReply, setIsSendingReply] = useState(false);
-    const [isSendingSuggested, setIsSendingSuggested] = useState(false);
     const [aiSuggestionModalOpen, setAiSuggestionModalOpen] = useState(false);
     const [aiSuggestionModalText, setAiSuggestionModalText] = useState('');
 
@@ -159,11 +150,6 @@ const MailThread = () => {
         [conversation]
     );
 
-    const lastAiReplyMessageId = useMemo(
-        () => getLastAiReplyMessageId(messagesSorted),
-        [messagesSorted]
-    );
-
     const openAiSuggestionModal = (m) => {
         setAiSuggestionModalText(getPersistedAiSuggestedText(m));
         setAiSuggestionModalOpen(true);
@@ -172,86 +158,6 @@ const MailThread = () => {
     const closeAiSuggestionModal = () => {
         setAiSuggestionModalOpen(false);
         setAiSuggestionModalText('');
-    };
-
-    const handleEnviarRespuestaSugerida = async () => {
-        setIsSendingSuggested(true);
-        try {
-            const resp = await EmailConversations.sendSuggestedReply(conversation._id);
-            const data = resp?.data;
-            if (data?.success === false) {
-                message.warning(data?.message || 'No se pudo enviar la respuesta sugerida');
-                return;
-            }
-            message.success(data?.message || 'Respuesta sugerida enviada');
-            setConversation((prev) => mergeConversationFromApi(prev, data));
-        } catch (err) {
-            if (err?.response?.status === 404) {
-                message.warning(
-                    'El servidor aún no implementa POST /emails/:id/reply/suggested.'
-                );
-            } else {
-                message.error(
-                    err?.response?.data?.message || err.message || 'Error al enviar la respuesta sugerida'
-                );
-            }
-        } finally {
-            setIsSendingSuggested(false);
-        }
-    };
-
-    const closeReplyModal = () => {
-        setIsReplyModalOpen(false);
-        setReplyBody('');
-        setReplyFileList([]);
-    };
-
-    const handleResponderManualmente = () => {
-        setReplyBody('');
-        setReplyFileList([]);
-        setIsReplyModalOpen(true);
-    };
-
-    const handleReplyUploadChange = ({ fileList }) => {
-        setReplyFileList(fileList);
-    };
-
-    const handleSendManualReply = async () => {
-        const text = String(replyBody || '').trim();
-        if (!text && replyFileList.length === 0) {
-            message.warning('Escribí el cuerpo del correo o adjuntá al menos un archivo.');
-            return;
-        }
-        setIsSendingReply(true);
-        try {
-            const fd = new FormData();
-            fd.append('text', text);
-            replyFileList.forEach((item) => {
-                const file = item.originFileObj ?? item;
-                if (file instanceof File) {
-                    fd.append('attachments', file);
-                }
-            });
-            const resp = await EmailConversations.sendManualReply(conversation._id, fd);
-            const data = resp?.data;
-            if (data?.success === false) {
-                message.warning(data?.message || 'No se pudo enviar la respuesta');
-                return;
-            }
-            message.success(data?.message || resp?.message || 'Respuesta enviada');
-            setConversation((prev) => mergeConversationFromApi(prev, data));
-            closeReplyModal();
-        } catch (err) {
-            if (err?.response?.status === 404) {
-                message.warning(
-                    'El servidor aún no implementa POST /emails/:id/reply. Cuando esté listo, el envío funcionará desde aquí.'
-                );
-            } else {
-                message.error(err?.response?.data?.message || err.message || 'Error al enviar la respuesta');
-            }
-        } finally {
-            setIsSendingReply(false);
-        }
     };
 
     if (!conversation) {
@@ -354,7 +260,9 @@ const MailThread = () => {
                                         backgroundColor: '#52c41a',
                                         borderColor: '#52c41a'
                                     }}
-                                    onClick={handleResponderManualmente}
+                                    onClick={() => {
+                                        console.log('Responder', conversation._id);
+                                    }}
                                 >
                                     Responder
                                 </Button>
@@ -434,33 +342,10 @@ const MailThread = () => {
                     <List
                         dataSource={messagesSorted}
                         locale={{ emptyText: 'No hay mensajes' }}
-                        renderItem={(m) => {
-                            const showChoice = shouldShowReplyChoiceActions(
-                                conversation,
-                                m,
-                                lastAiReplyMessageId
-                            );
-                            return (
+                        renderItem={(m) => (
                                 <MailThreadMessageItem
                                     message={m}
                                     formatDate={formatDate}
-                                    showReplyChoiceRow={showChoice}
-                                    replyChoiceSlot={
-                                        showChoice ? (
-                                            <>
-                                                <Button
-                                                    type="primary"
-                                                    loading={isSendingSuggested}
-                                                    onClick={handleEnviarRespuestaSugerida}
-                                                >
-                                                    Enviar respuesta sugerida
-                                                </Button>
-                                                <Button onClick={handleResponderManualmente}>
-                                                    Responder manualmente
-                                                </Button>
-                                            </>
-                                        ) : null
-                                    }
                                     showViewAiSuggestionButton={shouldShowViewAiSuggestionButton(m)}
                                     onViewAiSuggestion={openAiSuggestionModal}
                                     onOpenFeedbackAdjust={(msg) => {
@@ -474,8 +359,7 @@ const MailThread = () => {
                                         setIsFeedbackOpen(true);
                                     }}
                                 />
-                            );
-                        }}
+                        )}
                     />
                 </Card>
 
@@ -496,18 +380,6 @@ const MailThread = () => {
                         />
                     ) : null}
                 </Modal>
-
-                <ManualReplyModal
-                    open={isReplyModalOpen}
-                    onCancel={closeReplyModal}
-                    customerEmail={conversation.participants?.customer?.email}
-                    replyBody={replyBody}
-                    onReplyBodyChange={setReplyBody}
-                    replyFileList={replyFileList}
-                    onReplyUploadChange={handleReplyUploadChange}
-                    onSend={handleSendManualReply}
-                    sending={isSendingReply}
-                />
 
                 <AiSuggestedReplyModal
                     open={aiSuggestionModalOpen}

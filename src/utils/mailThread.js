@@ -35,8 +35,6 @@ export const isAiSuggestionHiddenFromThread = (message) => {
 export const shouldShowViewAiSuggestionButton = (message) =>
     getPersistedAiSuggestedText(message).length > 0 && isAiSuggestionHiddenFromThread(message);
 
-export const getVisibleMessageText = (message) => message?.content?.text ?? '';
-
 /* --- PDF cotización (desde pdf_base64) --- */
 
 export const normalizePdfBase64 = (raw) => {
@@ -63,44 +61,3 @@ export const getCotizacionBase64 = (conv) => {
     return null;
 };
 
-/* --- Último bloque “respuesta IA” para acciones Enviar sugerida / Manual --- */
-
-export const isOutboundAiMessage = (m) => {
-    if (!m || m.direction !== 'outbound') return false;
-    const meta = m.metadata || {};
-    if (m.ai === true || m.isAi === true || m.fromAi === true) return true;
-    if (m.source === 'ai' || m.role === 'assistant') return true;
-    if (meta.ai === true || meta.source === 'ai' || meta.from === 'assistant') return true;
-    return false;
-};
-
-export const getLastAiReplyMessageId = (messagesSortedList) => {
-    if (!messagesSortedList?.length) return null;
-    for (let i = messagesSortedList.length - 1; i >= 0; i--) {
-        const m = messagesSortedList[i];
-        if (isOutboundAiMessage(m)) return String(m._id ?? '');
-    }
-    for (let i = messagesSortedList.length - 1; i >= 0; i--) {
-        const m = messagesSortedList[i];
-        if (m.direction === 'outbound') return String(m._id ?? '');
-    }
-    return null;
-};
-
-/**
- * Mostrar "Enviar respuesta sugerida" / "Responder manualmente".
- * Preferir conversation.pendingReplyChoice del backend; si no viene, heurística legacy.
- */
-export const shouldShowReplyChoiceActions = (conversation, message, lastAiReplyMessageId) => {
-    if (!message || String(message._id) !== String(lastAiReplyMessageId)) return false;
-    if (conversation?.pendingReplyChoice === false) return false;
-    if (conversation?.pendingReplyChoice === true) return true;
-    return !isAiSuggestionHiddenFromThread(message);
-};
-
-/** Intenta fusionar la conversación devuelta por el API tras enviar respuesta. `payload` suele ser `response.data`. */
-export const mergeConversationFromApi = (prev, payload) => {
-    const next = payload?.conversation ?? payload?.data?.conversation;
-    if (next && typeof next === 'object') return { ...prev, ...next };
-    return prev;
-};

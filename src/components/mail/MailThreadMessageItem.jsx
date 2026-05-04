@@ -5,8 +5,6 @@ import { EditOutlined, MessageOutlined, RobotOutlined } from '@ant-design/icons'
 const MailThreadMessageItem = ({
     message: m,
     formatDate,
-    showReplyChoiceRow,
-    replyChoiceSlot,
     showViewAiSuggestionButton,
     onViewAiSuggestion,
     onOpenFeedbackAdjust,
@@ -66,9 +64,6 @@ const MailThreadMessageItem = ({
                     </div>
                 </div>
                 <div className="mt-2 whitespace-pre-wrap wrap-anywhere max-w-full text-gray-800">{m.content?.text || '—'}</div>
-                {showReplyChoiceRow && replyChoiceSlot ? (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">{replyChoiceSlot}</div>
-                ) : null}
             </div>
         </List.Item>
     );
