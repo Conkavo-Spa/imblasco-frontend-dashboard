@@ -40,6 +40,7 @@ const MailThread = () => {
     const [cotizacionPdfUrl, setCotizacionPdfUrl] = useState(null);
     const [aiSuggestionModalOpen, setAiSuggestionModalOpen] = useState(false);
     const [aiSuggestionModalText, setAiSuggestionModalText] = useState('');
+    const [isResponderCotABlas, setIsResponderCotABlas] = useState(false);
 
     // Limpiar modales al desmontar
     useEffect(() => {
@@ -260,8 +261,40 @@ const MailThread = () => {
                                         backgroundColor: '#52c41a',
                                         borderColor: '#52c41a'
                                     }}
-                                    onClick={() => {
-                                        console.log('Responder', conversation._id);
+                                    loading={isResponderCotABlas}
+                                    onClick={async () => {
+                                        const thread_id = conversation.external?.threadId || undefined;
+                                        const email_id =
+                                            conversation.emailsRawEmailId ||
+                                            conversation.emails_raw_email_id ||
+                                            conversation.systemEmailId ||
+                                            undefined;
+                                        if (!thread_id && !email_id) {
+                                            message.error('Falta thread_id o email_id del correo sistema para registrar la cotización.');
+                                            return;
+                                        }
+                                        setIsResponderCotABlas(true);
+                                        try {
+                                            const resp = await EmailConversations.responderCotABlas({
+                                                thread_id,
+                                                email_id,
+                                            });
+                                            const data = resp?.data ?? resp;
+                                            const ok = data?.success === true;
+                                            if (ok) {
+                                                message.success(data?.message || 'Cotización registrada como pendiente');
+                                            } else {
+                                                message.error(data?.message || 'No se pudo registrar la cotización');
+                                            }
+                                        } catch (err) {
+                                            const msg =
+                                                err?.response?.data?.message ||
+                                                err?.message ||
+                                                'Error al contactar el servidor';
+                                            message.error(msg);
+                                        } finally {
+                                            setIsResponderCotABlas(false);
+                                        }
                                     }}
                                 >
                                     Responder
