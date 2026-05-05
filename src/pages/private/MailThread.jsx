@@ -21,6 +21,21 @@ const formatDate = (date) => {
     });
 };
 
+const mensajeErrorApi = (err) => {
+    const data = err?.response?.data;
+    if (data && typeof data === 'object' && data.message) {
+        const code = data.code ? ` (${String(data.code)})` : '';
+        return `${data.message}${code}`;
+    }
+    if (err?.response?.status === 404) {
+        return 'El servidor respondió 404. Revisá que el backend desplegado exponga POST /api/emails/responder/enviar-cotizacion y que la URL base del front apunte a ese servicio.';
+    }
+    if (typeof data === 'string' && data.trim().length > 0 && data.length < 240) {
+        return data.trim();
+    }
+    return err?.message || 'Error al contactar el servidor';
+};
+
 const MailThread = () => {
     const navigate = useNavigate();
     const { id } = useParams();
@@ -263,35 +278,65 @@ const MailThread = () => {
                                     }}
                                     loading={isResponderCotABlas}
                                     onClick={async () => {
+                                        const conversation_id = conversation._id;
                                         const thread_id = conversation.external?.threadId || undefined;
                                         const email_id =
                                             conversation.emailsRawEmailId ||
                                             conversation.emails_raw_email_id ||
                                             conversation.systemEmailId ||
                                             undefined;
+                                        if (!conversation_id) {
+                                            message.error('Falta el id de la conversación.');
+                                            return;
+                                        }
                                         if (!thread_id && !email_id) {
-                                            message.error('Falta thread_id o email_id del correo sistema para registrar la cotización.');
+                                            message.error(
+                                                'Falta thread_id o email_id del correo sistema para enviar la cotización.',
+                                            );
                                             return;
                                         }
                                         setIsResponderCotABlas(true);
                                         try {
-                                            const resp = await EmailConversations.responderCotABlas({
+                                            const mode =
+                                                import.meta.env.VITE_DASH_EMAIL_MODE === 'prod' ? 'prod' : 'test';
+                                            const resp = await EmailConversations.enviarRespuestaCotizacion({
+                                                conversation_id,
                                                 thread_id,
                                                 email_id,
+                                                mode,
                                             });
-                                            const data = resp?.data ?? resp;
-                                            const ok = data?.success === true;
-                                            if (ok) {
-                                                message.success(data?.message || 'Cotización registrada como pendiente');
+                                            if (resp?.success === true) {
+                                                message.success(resp.message || 'Cotización enviada');
+                                                const nm = resp?.data?.message;
+                                                if (nm) {
+                                                    setConversation((prev) => {
+                                                        const msgs = [...(prev.messages || [])];
+                                                        if (!msgs.some((m) => m.id === nm.id)) msgs.push(nm);
+                                                        const preview = (nm.content?.text || '').slice(0, 140);
+                                                        return {
+                                                            ...prev,
+                                                            messages: msgs,
+                                                            summary: {
+                                                                ...(prev.summary || {}),
+                                                                messageCount: msgs.length,
+                                                                lastMessageAt: nm.sentAt || prev.summary?.lastMessageAt,
+                                                                lastMessagePreview:
+                                                                    preview || prev.summary?.lastMessagePreview,
+                                                            },
+                                                        };
+                                                    });
+                                                }
                                             } else {
-                                                message.error(data?.message || 'No se pudo registrar la cotización');
+                                                message.error(resp?.message || 'No se pudo enviar la cotización');
                                             }
                                         } catch (err) {
-                                            const msg =
-                                                err?.response?.data?.message ||
-                                                err?.message ||
-                                                'Error al contactar el servidor';
-                                            message.error(msg);
+                                            const status = err?.response?.status;
+                                            const msg = mensajeErrorApi(err);
+                                            if (status === 409) {
+                                                message.warning(msg);
+                                            } else {
+                                                message.error(msg);
+                                            }
                                         } finally {
                                             setIsResponderCotABlas(false);
                                         }

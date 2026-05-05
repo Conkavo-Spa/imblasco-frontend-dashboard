@@ -24,6 +24,19 @@ class EmailConversationsService {
             thread_id: payload.thread_id,
             email_id: payload.email_id,
         });
+
+    /**
+     * Envía la cotización por SMTP (Programa 8 / dashboard), parchea PDF y actualiza la conversación.
+     * @param {{ conversation_id: string, thread_id?: string, email_id?: string, mode?: 'test'|'prod', numero_cotizacion?: string }} payload
+     */
+    enviarRespuestaCotizacion = (payload = {}) =>
+        instance.post('/emails/responder/enviar-cotizacion', {
+            conversation_id: payload.conversation_id,
+            thread_id: payload.thread_id,
+            email_id: payload.email_id,
+            mode: payload.mode,
+            numero_cotizacion: payload.numero_cotizacion,
+        });
 }
 
 const EmailConversations = new EmailConversationsService();
