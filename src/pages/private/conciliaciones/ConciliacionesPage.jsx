@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import PrivatePageShell from '../../../components/PrivatePageShell';
-import { Modal, Descriptions, Row, Col, message, Button } from 'antd';
+import { Modal, Descriptions, Row, Col, message, Button, Tag } from 'antd';
 import {
     FileTextOutlined,
     BankOutlined,
@@ -56,6 +56,19 @@ function formatFooterRange(dateRange) {
     if (!a || !b) return '—';
     const opts = { day: '2-digit', month: 'short', year: 'numeric' };
     return `${a.toDate().toLocaleString('es-CL', opts)} — ${b.toDate().toLocaleString('es-CL', opts)}`;
+}
+
+function getMovementTypeTag(type) {
+    const typeNorm = String(type || '').toLowerCase().trim();
+    const configs = {
+        transfer: { label: 'Transferencia', color: 'blue' },
+        check: { label: 'Cheque', color: 'orange' },
+        deposit: { label: 'Depósito', color: 'green' },
+        credit: { label: 'Crédito', color: 'cyan' },
+        other: { label: 'Otro', color: 'default' },
+    };
+    const config = configs[typeNorm] || { label: typeNorm || 'Transferencia', color: 'default' };
+    return <Tag color={config.color}>{config.label}</Tag>;
 }
 
 /**
@@ -628,8 +641,8 @@ export default function ConciliacionesPage() {
                                                         ? formatCLP(row.amount)
                                                         : '—'}
                                                 </div>
-                                                <div className="mt-0.5 text-[10px] text-[#A8A8A2]">
-                                                    {row.type || 'Transferencia'}
+                                                <div className="mt-0.5">
+                                                    {getMovementTypeTag(row.type)}
                                                 </div>
                                             </div>
                                         </button>
