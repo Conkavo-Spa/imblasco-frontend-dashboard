@@ -104,7 +104,13 @@ export default function ConciliacionesPage() {
         [conciliaciones]
     );
 
-    const [mainTab, setMainTab] = useState('pendientes'); // 'pendientes' | 'historial'
+    // Cotizaciones que NO han sido conciliadas
+    const noConciliadas = useMemo(
+        () => cotizaciones.filter((c) => !conciliadasCotizacionIds.has(c.id)),
+        [cotizaciones, conciliadasCotizacionIds]
+    );
+
+    const [mainTab, setMainTab] = useState('pendientes'); // 'pendientes' | 'historial' | 'no_conciliadas'
     const [estadoFiltro, setEstadoFiltro] = useState('all');
     const [searchText, setSearchText] = useState('');
     const [minMonto, setMinMonto] = useState(null);
@@ -422,6 +428,23 @@ export default function ConciliacionesPage() {
                                 </span>
                             )}
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setMainTab('no_conciliadas')}
+                            className={[
+                                'px-4 py-2 text-[13px] font-semibold border-b-2 -mb-px transition-colors',
+                                mainTab === 'no_conciliadas'
+                                    ? 'border-[#1A6B3C] text-[#1A6B3C]'
+                                    : 'border-transparent text-[#6B6B65] hover:text-[#1A1A18]',
+                            ].join(' ')}
+                        >
+                            Sin Conciliar
+                            {noConciliadas.length > 0 && (
+                                <span className="ml-2 rounded-full bg-[#FEE2E2] px-1.5 py-0.5 text-[10px] font-bold text-[#DC2626]">
+                                    {noConciliadas.length}
+                                </span>
+                            )}
+                        </button>
                     </div>
 
                     {mainTab === 'historial' ? (
@@ -486,6 +509,77 @@ export default function ConciliacionesPage() {
                                                     </td>
                                                 </tr>
                                             ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    ) : null}
+
+                    {mainTab === 'no_conciliadas' ? (
+                        <div className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
+                            <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
+                                <span className="text-[11.5px] font-bold uppercase tracking-wide text-[#1A1A18]">
+                                    Cotizaciones sin conciliar
+                                </span>
+                                <span className="font-mono text-[11px] text-[#A8A8A2]">
+                                    {noConciliadas.length} registros
+                                </span>
+                            </div>
+                            {noConciliadas.length === 0 ? (
+                                <div className="p-10 text-center text-sm text-[#6B6B65]">
+                                    Todas las cotizaciones han sido conciliadas. ✓
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-[12px]">
+                                        <thead className="border-b border-[#E4E4DF] bg-[#FAFAF8] text-[10px] font-bold uppercase tracking-wide text-[#A8A8A2]">
+                                            <tr>
+                                                <th className="px-4 py-2">N° Cotización</th>
+                                                <th className="px-4 py-2">Fecha emisión</th>
+                                                <th className="px-4 py-2">Cliente</th>
+                                                <th className="px-4 py-2">RUT</th>
+                                                <th className="px-4 py-2 text-right">Monto</th>
+                                                <th className="px-4 py-2 text-right">Días sin pago</th>
+                                                <th className="px-4 py-2">Estado</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {noConciliadas.map((c) => {
+                                                const diasSinPago = dayjs().diff(dayjs(c.fecha), 'day');
+                                                const estado = diasSinPago > 30 ? 'Vencida' : 'Sin pago';
+                                                const estadoColor = diasSinPago > 30 ? '#EA580C' : '#DC2626';
+                                                return (
+                                                    <tr key={c.id} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
+                                                        <td className="px-4 py-2.5 font-mono font-semibold text-[#1D4ED8]">
+                                                            {c.id ?? '—'}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
+                                                            {c.fecha ?? '—'}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-[#1A1A18]">
+                                                            {c.cliente ?? '—'}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
+                                                            {formatChileRutDisplay(c.rut)}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-right font-mono font-semibold text-[#1A1A18]">
+                                                            {typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-right font-mono text-[#6B6B65]">
+                                                            {diasSinPago}
+                                                        </td>
+                                                        <td className="px-4 py-2.5">
+                                                            <span
+                                                                className="inline-flex rounded-full px-2 py-1 text-[10px] font-semibold text-white"
+                                                                style={{ backgroundColor: estadoColor }}
+                                                            >
+                                                                {estado}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
