@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import PrivatePageShell from '../../../components/PrivatePageShell';
-import { Modal, Descriptions, Row, Col, message, Button, Tag } from 'antd';
+import { Modal, Descriptions, Row, Col, message, Button, Tag, Spin, Table } from 'antd';
 import {
     FileTextOutlined,
     BankOutlined,
@@ -110,6 +110,11 @@ export default function ConciliacionesPage() {
     const [minMonto, setMinMonto] = useState(null);
     const [maxMonto, setMaxMonto] = useState(null);
     const [bancoFiltro, setBancoFiltro] = useState(null);
+
+    // Modal de detalle de conciliación
+    const [modalConciliacion, setModalConciliacion] = useState(null);
+    const [detalleProductos, setDetalleProductos] = useState(null);
+    const [loadingDetalle, setLoadingDetalle] = useState(false);
 
     const [selectedCuentaTabKey, setSelectedCuentaTabKey] = useState('all');
     const [selectedMovementId, setSelectedMovementId] = useState(null);
@@ -286,6 +291,25 @@ export default function ConciliacionesPage() {
         setRange(desde.format('YYYY-MM-DD'), d.format('YYYY-MM-DD'));
     }, [dateRange, setRange]);
 
+    const handleOpenModalDetalle = useCallback(async (conciliacion) => {
+        setModalConciliacion(conciliacion);
+        setDetalleProductos(null);
+        setLoadingDetalle(true);
+        try {
+            const response = await conciliationApi.getCotizacionDetalle(conciliacion.cotizacion_id);
+            if (response.data?.success) {
+                setDetalleProductos(response.data.data);
+            } else {
+                setDetalleProductos({ error: 'No se pudieron cargar los detalles' });
+            }
+        } catch (error) {
+            console.error('Error al cargar detalle:', error);
+            setDetalleProductos({ error: 'Error al cargar detalles' });
+        } finally {
+            setLoadingDetalle(false);
+        }
+    }, []);
+
     const subheader =
         import.meta.env.VITE_CONCILIACIONES_HEADER_SUB?.trim?.() || '';
 
@@ -432,7 +456,11 @@ export default function ConciliacionesPage() {
                                         </thead>
                                         <tbody>
                                             {conciliaciones.map((c) => (
-                                                <tr key={c._id} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
+                                                <tr
+                                                    key={c._id}
+                                                    onClick={() => handleOpenModalDetalle(c)}
+                                                    className="cursor-pointer border-b border-[#E4E4DF] hover:bg-[#FAFAF8] transition-colors"
+                                                >
                                                     <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
                                                         {c.fecha_movimiento ?? '—'}
                                                     </td>
@@ -1007,6 +1035,129 @@ export default function ConciliacionesPage() {
                         </Col>
                     </Row>
                 ) : null}
+            </Modal>
+
+            {/* Modal de detalle de conciliación */}
+            <Modal
+                title={`Detalle de Conciliación #${modalConciliacion?.cotizacion_id ?? '—'}`}
+                open={!!modalConciliacion}
+                onCancel={() => {
+                    setModalConciliacion(null);
+                    setDetalleProductos(null);
+                }}
+                width={900}
+                footer={null}
+            >
+                {modalConciliacion && (
+                    <Spin spinning={loadingDetalle}>
+                        <div className="space-y-6">
+                            {/* Sección movimiento bancario */}
+                            <div>
+                                <h3 className="mb-3 font-semibold text-gray-800">Movimiento Bancario</h3>
+                                <Descriptions size="small" column={2}>
+                                    <Descriptions.Item label="Monto">
+                                        {typeof modalConciliacion.monto === 'number'
+                                            ? formatCLP(modalConciliacion.monto)
+                                            : '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Fecha">
+                                        {modalConciliacion.fecha_movimiento ?? '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Banco">
+                                        {modalConciliacion.bank_name ?? '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Descripción">
+                                        {modalConciliacion.movement?.description ?? '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Pagador" span={2}>
+                                        {modalConciliacion.movement?.sender_account?.holder_name ??
+                                            modalConciliacion.cliente ??
+                                            '—'}
+                                    </Descriptions.Item>
+                                </Descriptions>
+                            </div>
+
+                            {/* Sección cotización */}
+                            <div>
+                                <h3 className="mb-3 font-semibold text-gray-800">Cotización/Nota</h3>
+                                <Descriptions size="small" column={2}>
+                                    <Descriptions.Item label="Número">
+                                        {modalConciliacion.cotizacion_id ?? '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Cliente">
+                                        {modalConciliacion.cliente ?? '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="RUT">
+                                        {formatChileRutDisplay(modalConciliacion.rut)}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Fecha">
+                                        {modalConciliacion.cotizacion?.fecha ?? '—'}
+                                    </Descriptions.Item>
+                                    <Descriptions.Item label="Total Venta" span={2}>
+                                        {typeof modalConciliacion.cotizacion?.monto === 'number'
+                                            ? formatCLP(modalConciliacion.cotizacion.monto)
+                                            : '—'}
+                                    </Descriptions.Item>
+                                </Descriptions>
+                            </div>
+
+                            {/* Tabla de productos */}
+                            <div>
+                                <h3 className="mb-3 font-semibold text-gray-800">Productos/Items</h3>
+                                {detalleProductos?.error ? (
+                                    <div className="rounded bg-red-50 p-3 text-sm text-red-600">
+                                        {detalleProductos.error}
+                                    </div>
+                                ) : detalleProductos?.detalle && Array.isArray(detalleProductos.detalle) ? (
+                                    <Table
+                                        columns={[
+                                            {
+                                                title: 'Descripción',
+                                                dataIndex: 'descripcion',
+                                                key: 'descripcion',
+                                            },
+                                            {
+                                                title: 'Cantidad',
+                                                dataIndex: 'cantidad',
+                                                key: 'cantidad',
+                                                align: 'right',
+                                                width: 100,
+                                            },
+                                            {
+                                                title: 'Precio Unit.',
+                                                dataIndex: 'precio',
+                                                key: 'precio',
+                                                align: 'right',
+                                                width: 120,
+                                                render: (v) =>
+                                                    typeof v === 'number' ? formatCLP(v) : '—',
+                                            },
+                                            {
+                                                title: 'Total',
+                                                dataIndex: 'total',
+                                                key: 'total',
+                                                align: 'right',
+                                                width: 120,
+                                                render: (v) =>
+                                                    typeof v === 'number' ? formatCLP(v) : '—',
+                                            },
+                                        ]}
+                                        dataSource={detalleProductos.detalle.map((item, i) => ({
+                                            key: i,
+                                            ...item,
+                                        }))}
+                                        pagination={false}
+                                        size="small"
+                                    />
+                                ) : (
+                                    <div className="rounded bg-gray-50 p-3 text-sm text-gray-600">
+                                        No hay detalle de productos
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </Spin>
+                )}
             </Modal>
         </PrivatePageShell>
     );

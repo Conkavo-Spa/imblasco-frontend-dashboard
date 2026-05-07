@@ -44,6 +44,16 @@ class ConciliationService {
             { params: { fecha, monto, hora: hora ?? '' } }
         );
     }
+
+    /**
+     * @param {string | number} cotizacionId
+     * @returns Cotización completa con array detalle (productos)
+     */
+    getCotizacionDetalle(cotizacionId) {
+        return instance.get(
+            `/conciliations/cotizaciones/${encodeURIComponent(cotizacionId)}/detalle`
+        );
+    }
 }
 
 const conciliationApi = new ConciliationService();
