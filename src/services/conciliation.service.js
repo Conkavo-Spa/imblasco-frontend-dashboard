@@ -10,7 +10,7 @@ class ConciliationService {
      */
     listMovements(range) {
         const { since, until } = range;
-        return instance.get('/conciliations/movements', {
+        return instance.get('/conciliations/movements-from-json', {
             params: { since, until },
         });
     }
