@@ -277,6 +277,7 @@ const MailThread = () => {
                                         borderColor: '#52c41a'
                                     }}
                                     loading={isResponderCotABlas}
+                                    disabled={true}
                                     onClick={async () => {
                                         const conversation_id = conversation._id;
                                         const thread_id = conversation.external?.threadId || undefined;
