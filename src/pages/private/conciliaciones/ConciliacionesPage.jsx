@@ -526,7 +526,9 @@ export default function ConciliacionesPage() {
                                     {noConciliadas.length} registros
                                 </span>
                             </div>
-                            {noConciliadas.length === 0 ? (
+                            {cotizaciones.length === 0 && conciliaciones.length === 0 ? (
+                                <div className="p-8 text-center text-sm text-[#6B6B65]">Cargando cotizaciones…</div>
+                            ) : noConciliadas.length === 0 ? (
                                 <div className="p-10 text-center text-sm text-[#6B6B65]">
                                     Todas las cotizaciones han sido conciliadas. ✓
                                 </div>
