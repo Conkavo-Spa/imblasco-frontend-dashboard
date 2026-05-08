@@ -111,10 +111,21 @@ export default function ConciliacionesPage() {
         [conciliaciones]
     );
 
-    // Cotizaciones y Facturas que NO han sido conciliadas
+    // Cotizaciones que NO han sido conciliadas
+    const noCotizaciones = useMemo(
+        () => cotizaciones.filter((c) => !conciliadasCotizacionIds.has(c.id)),
+        [cotizaciones, conciliadasCotizacionIds]
+    );
+
+    // Facturas que NO han sido conciliadas
+    const noFacturas = useMemo(
+        () => facturas.filter((f) => !conciliadasFacturaIds.has(f.id)),
+        [facturas, conciliadasFacturaIds]
+    );
+
+    // Combinadas y ordenadas
     const noConciliadas = useMemo(() => {
-        const noCotizaciones = cotizaciones.filter((c) => !conciliadasCotizacionIds.has(c.id));
-        const noFacturas = facturas.filter((f) => !conciliadasFacturaIds.has(f.id));
+        if (!noFacturas || !noCotizaciones) return [];
         const combined = [
             ...noFacturas.map((f) => ({ ...f, _type: 'factura' })),
             ...noCotizaciones.map((c) => ({ ...c, _type: 'cotizacion' })),
@@ -124,7 +135,7 @@ export default function ConciliacionesPage() {
             const db = String(b.fecha || '');
             return db.localeCompare(da);
         });
-    }, [cotizaciones, facturas, conciliadasCotizacionIds, conciliadasFacturaIds]);
+    }, [noFacturas, noCotizaciones]);
 
     const [mainTab, setMainTab] = useState('pendientes'); // 'pendientes' | 'historial' | 'no_conciliadas'
     const [estadoFiltro, setEstadoFiltro] = useState('all');
