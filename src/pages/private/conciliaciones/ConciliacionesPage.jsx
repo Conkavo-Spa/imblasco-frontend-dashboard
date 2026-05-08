@@ -11,6 +11,7 @@ import dayjs from 'dayjs';
 import { useMediaQuery } from 'react-responsive';
 import { useConciliationTransfers } from '../../../hooks/useConciliationTransfers';
 import { useCotizaciones } from '../../../hooks/useCotizaciones';
+import { useFacturas } from '../../../hooks/useFacturas';
 import { useConciliaciones } from '../../../hooks/useConciliaciones';
 import { matchMovementToSeed } from '../../../lib/conciliation/matchMovementToSeed';
 import { reconcileMovementAgainstSeeds } from '../../../lib/conciliation/reconcileMovementAgainstSeeds';
@@ -23,6 +24,7 @@ import { filterTransferenciaRows } from '../../../lib/conciliation/filterTransfe
 import { formatCLP } from '../../../utils/formatCLP';
 import { formatChileRutDisplay } from '../../../lib/conciliation/formatChileRutDisplay';
 import ConciliacionesFilters from './ConciliacionesFilters';
+import conciliationApi from '../../../services/conciliation.service';
 import { SEED_IDS_PRECONCILIADAS_DEMO } from './conciliacionDemo.constants';
 
 function initialsFromName(name) {
@@ -86,11 +88,12 @@ export default function ConciliacionesPage() {
         initialRange.until
     );
 
-    // Cotizaciones: rango amplio (último año) independiente del rango de movimientos.
-    // El pago llega semanas/meses después de emitir la cotización.
-    const cotizacionesSince = useMemo(() => dayjs().subtract(1, 'year').format('YYYY-MM-DD'), []);
-    const cotizacionesUntil = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
-    const { cotizaciones } = useCotizaciones(cotizacionesSince, cotizacionesUntil);
+    // Cotizaciones y Facturas: rango amplio (último año) independiente del rango de movimientos.
+    // El pago llega semanas/meses después de emitir el documento.
+    const documentosSince = useMemo(() => dayjs().subtract(1, 'year').format('YYYY-MM-DD'), []);
+    const documentosUntil = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
+    const { cotizaciones } = useCotizaciones(documentosSince, documentosUntil);
+    const { facturas } = useFacturas(documentosSince, documentosUntil);
 
     const { conciliaciones, loading: loadingHistorial, refetch: refetchHistorial } = useConciliaciones();
 
@@ -100,15 +103,28 @@ export default function ConciliacionesPage() {
         [conciliaciones]
     );
     const conciliadasCotizacionIds = useMemo(
-        () => new Set(conciliaciones.map((c) => String(c.cotizacion_id))),
+        () => new Set(conciliaciones.filter((c) => c.document_type !== 'factura').map((c) => String(c.cotizacion_id))),
+        [conciliaciones]
+    );
+    const conciliadasFacturaIds = useMemo(
+        () => new Set(conciliaciones.filter((c) => c.document_type === 'factura').map((c) => String(c.factura_id))),
         [conciliaciones]
     );
 
-    // Cotizaciones que NO han sido conciliadas
-    const noConciliadas = useMemo(
-        () => cotizaciones.filter((c) => !conciliadasCotizacionIds.has(c.id)),
-        [cotizaciones, conciliadasCotizacionIds]
-    );
+    // Cotizaciones y Facturas que NO han sido conciliadas
+    const noConciliadas = useMemo(() => {
+        const noCotizaciones = cotizaciones.filter((c) => !conciliadasCotizacionIds.has(c.id));
+        const noFacturas = facturas.filter((f) => !conciliadasFacturaIds.has(f.id));
+        const combined = [
+            ...noFacturas.map((f) => ({ ...f, _type: 'factura' })),
+            ...noCotizaciones.map((c) => ({ ...c, _type: 'cotizacion' })),
+        ];
+        return combined.sort((a, b) => {
+            const da = String(a.fecha || '');
+            const db = String(b.fecha || '');
+            return db.localeCompare(da);
+        });
+    }, [cotizaciones, facturas, conciliadasCotizacionIds, conciliadasFacturaIds]);
 
     const [mainTab, setMainTab] = useState('pendientes'); // 'pendientes' | 'historial' | 'no_conciliadas'
     const [estadoFiltro, setEstadoFiltro] = useState('all');
@@ -131,6 +147,7 @@ export default function ConciliacionesPage() {
     const [cotizacionManualPorMovimientoId, setCotizacionManualPorMovimientoId] =
         useState({});
     const [conciliandoId, setConciliandoId] = useState(null);
+    const [docSeleccionado, setDocSeleccionado] = useState('factura'); // 'factura' | 'cotizacion'
 
     const isNarrow = useMediaQuery({ maxWidth: 1100 });
 
@@ -207,6 +224,21 @@ export default function ConciliacionesPage() {
         [filteredRows]
     );
 
+    // Auto-select document when only one option exists
+    useEffect(() => {
+        if (selectedRow) {
+            const hasFactura = !!sugerenciaFactura;
+            const hasCotizacion = !!sugerenciaSeed;
+
+            if (hasFactura && !hasCotizacion) {
+                setDocSeleccionado('factura');
+            } else if (!hasFactura && hasCotizacion) {
+                setDocSeleccionado('cotizacion');
+            }
+            // If both exist, keep user's selection; if neither, selection doesn't matter
+        }
+    }, [selectedRow, sugerenciaFactura, sugerenciaSeed]);
+
     useEffect(() => {
         if (
             selectedMovementId &&
@@ -225,10 +257,15 @@ export default function ConciliacionesPage() {
         [pendientesLista, selectedMovementId]
     );
 
+    const sugerenciaFactura = useMemo(() => {
+        if (!selectedRow) return null;
+        return matchMovementToSeed(selectedRow, facturas.filter((f) => !conciliadasFacturaIds.has(f.id)));
+    }, [selectedRow, facturas, conciliadasFacturaIds]);
+
     const sugerenciaSeed = useMemo(() => {
         if (!selectedRow) return null;
-        return matchMovementToSeed(selectedRow, cotizaciones);
-    }, [selectedRow]);
+        return matchMovementToSeed(selectedRow, cotizaciones.filter((c) => !conciliadasCotizacionIds.has(c.id)));
+    }, [selectedRow, cotizaciones, conciliadasCotizacionIds]);
 
     const handleSelectRow = useCallback((row) => {
         setSelectedMovementId(row.id);
@@ -239,11 +276,41 @@ export default function ConciliacionesPage() {
         const record = selectedRow;
         const mid = record?.id;
         if (!mid || !record) return;
+
+        let selectedDoc = null;
+        let documentType = docSeleccionado;
+
+        if (docSeleccionado === 'factura' && sugerenciaFactura) {
+            selectedDoc = sugerenciaFactura;
+        } else if (docSeleccionado === 'cotizacion' && sugerenciaSeed) {
+            selectedDoc = sugerenciaSeed;
+        }
+
+        if (!selectedDoc) {
+            message.warning(`No hay ${docSeleccionado} seleccionada para conciliar.`);
+            return;
+        }
+
         setFlowStep(3);
         setConciliandoId(mid);
         try {
-            const found = await reconcileMovementAgainstSeeds(record, cotizaciones);
+            const seedsToUse = documentType === 'factura' ? facturas : cotizaciones;
+            const found = await reconcileMovementAgainstSeeds(record, seedsToUse);
+
             if (found) {
+                const payload = {
+                    movement: record,
+                    document_type: documentType,
+                };
+
+                if (documentType === 'factura') {
+                    payload.factura = selectedDoc;
+                } else {
+                    payload.cotizacion = selectedDoc;
+                }
+
+                await conciliationApi.saveConciliacion(payload);
+
                 setCotizacionManualPorMovimientoId((prev) => ({
                     ...prev,
                     [mid]: found,
@@ -253,10 +320,11 @@ export default function ConciliacionesPage() {
                 message.success('Conciliación registrada correctamente');
                 setSelectedMovementId(null);
                 setFlowStep(1);
+                setDocSeleccionado('factura');
                 refetchHistorial();
             } else {
                 message.warning(
-                    'No se encontró cotización que cierre con este movimiento en Fintoc.'
+                    `No se encontró ${documentType === 'factura' ? 'factura' : 'cotización'} que cierre con este movimiento en Fintoc.`
                 );
                 setFlowStep(2);
             }
@@ -271,7 +339,7 @@ export default function ConciliacionesPage() {
         } finally {
             setConciliandoId(null);
         }
-    }, [selectedRow]);
+    }, [selectedRow, docSeleccionado, sugerenciaFactura, sugerenciaSeed, facturas, cotizaciones]);
 
     const handleDesdeChange = useCallback((d) => {
         if (!d) return;
@@ -364,8 +432,8 @@ export default function ConciliacionesPage() {
 
     const rightTitle = !selectedRow
         ? '— Selecciona una transferencia'
-        : sugerenciaSeed
-          ? '1 coincidencia encontrada'
+        : sugerenciaFactura || sugerenciaSeed
+          ? `${(sugerenciaFactura ? 1 : 0) + (sugerenciaSeed ? 1 : 0)} coincidencia${(sugerenciaFactura && sugerenciaSeed) ? 's' : ''} encontrada${(sugerenciaFactura && sugerenciaSeed) ? 's' : ''}`
           : '— Sin coincidencia';
 
     return (
@@ -470,7 +538,8 @@ export default function ConciliacionesPage() {
                                             <tr>
                                                 <th className="px-4 py-2">Fecha pago</th>
                                                 <th className="px-4 py-2">Banco</th>
-                                                <th className="px-4 py-2">Cotización</th>
+                                                <th className="px-4 py-2">Tipo</th>
+                                                <th className="px-4 py-2">N° Documento</th>
                                                 <th className="px-4 py-2">Cliente</th>
                                                 <th className="px-4 py-2">RUT</th>
                                                 <th className="px-4 py-2 text-right">Monto</th>
@@ -478,25 +547,38 @@ export default function ConciliacionesPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {conciliaciones.map((c) => (
-                                                <tr
-                                                    key={c._id}
-                                                    onClick={() => handleOpenModalDetalle(c)}
-                                                    className="cursor-pointer border-b border-[#E4E4DF] hover:bg-[#FAFAF8] transition-colors"
-                                                >
-                                                    <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
-                                                        {c.fecha_movimiento ?? '—'}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-[#6B6B65]">
-                                                        {c.bank_name ?? '—'}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 font-mono font-semibold text-[#1D4ED8]">
-                                                        {c.cotizacion_id ?? '—'}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 text-[#1A1A18]">
-                                                        {c.cliente ?? '—'}
-                                                    </td>
-                                                    <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
+                                            {conciliaciones.map((c) => {
+                                                const isFactura = c.document_type === 'factura';
+                                                const docId = isFactura ? c.factura_id : c.cotizacion_id;
+                                                const docTypeLabel = isFactura ? 'FAC' : 'COT';
+                                                const docTypeColor = isFactura ? '#16A34A' : '#1D4ED8';
+                                                return (
+                                                    <tr
+                                                        key={c._id}
+                                                        onClick={() => handleOpenModalDetalle(c)}
+                                                        className="cursor-pointer border-b border-[#E4E4DF] hover:bg-[#FAFAF8] transition-colors"
+                                                    >
+                                                        <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
+                                                            {c.fecha_movimiento ?? '—'}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-[#6B6B65]">
+                                                            {c.bank_name ?? '—'}
+                                                        </td>
+                                                        <td className="px-4 py-2.5">
+                                                            <span
+                                                                className="inline-flex rounded px-2 py-1 text-[10px] font-semibold text-white"
+                                                                style={{ backgroundColor: docTypeColor }}
+                                                            >
+                                                                {docTypeLabel}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-2.5 font-mono font-semibold" style={{ color: docTypeColor }}>
+                                                            {docId ?? '—'}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 text-[#1A1A18]">
+                                                            {c.cliente ?? '—'}
+                                                        </td>
+                                                        <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
                                                         {formatChileRutDisplay(c.rut)}
                                                     </td>
                                                     <td className="px-4 py-2.5 text-right font-mono font-semibold text-[#1A1A18]">
@@ -508,7 +590,8 @@ export default function ConciliacionesPage() {
                                                             : '—'}
                                                     </td>
                                                 </tr>
-                                            ))}
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -520,24 +603,25 @@ export default function ConciliacionesPage() {
                         <div className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
                             <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
                                 <span className="text-[11.5px] font-bold uppercase tracking-wide text-[#1A1A18]">
-                                    Cotizaciones sin conciliar
+                                    Facturas y cotizaciones sin conciliar
                                 </span>
                                 <span className="font-mono text-[11px] text-[#A8A8A2]">
                                     {noConciliadas.length} registros
                                 </span>
                             </div>
-                            {cotizaciones.length === 0 && conciliaciones.length === 0 ? (
-                                <div className="p-8 text-center text-sm text-[#6B6B65]">Cargando cotizaciones…</div>
+                            {(cotizaciones.length === 0 || facturas.length === 0) && conciliaciones.length === 0 ? (
+                                <div className="p-8 text-center text-sm text-[#6B6B65]">Cargando documentos…</div>
                             ) : noConciliadas.length === 0 ? (
                                 <div className="p-10 text-center text-sm text-[#6B6B65]">
-                                    Todas las cotizaciones han sido conciliadas. ✓
+                                    Todas las facturas y cotizaciones han sido conciliadas. ✓
                                 </div>
                             ) : (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left text-[12px]">
                                         <thead className="border-b border-[#E4E4DF] bg-[#FAFAF8] text-[10px] font-bold uppercase tracking-wide text-[#A8A8A2]">
                                             <tr>
-                                                <th className="px-4 py-2">N° Cotización</th>
+                                                <th className="px-4 py-2">Tipo</th>
+                                                <th className="px-4 py-2">N° Documento</th>
                                                 <th className="px-4 py-2">Fecha emisión</th>
                                                 <th className="px-4 py-2">Cliente</th>
                                                 <th className="px-4 py-2">RUT</th>
@@ -547,26 +631,37 @@ export default function ConciliacionesPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {noConciliadas.map((c) => {
-                                                const diasSinPago = dayjs().diff(dayjs(c.fecha), 'day');
+                                            {noConciliadas.map((doc) => {
+                                                const diasSinPago = dayjs().diff(dayjs(doc.fecha), 'day');
                                                 const estado = diasSinPago > 30 ? 'Vencida' : 'Sin pago';
                                                 const estadoColor = diasSinPago > 30 ? '#EA580C' : '#DC2626';
+                                                const isFactura = doc._type === 'factura';
+                                                const tipoBadgeColor = isFactura ? '#16A34A' : '#1D4ED8';
+                                                const tipoLabel = isFactura ? 'FAC' : 'COT';
                                                 return (
-                                                    <tr key={c.id} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
-                                                        <td className="px-4 py-2.5 font-mono font-semibold text-[#1D4ED8]">
-                                                            {c.id ?? '—'}
+                                                    <tr key={`${doc._type}-${doc.id}`} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
+                                                        <td className="px-4 py-2.5">
+                                                            <span
+                                                                className="inline-flex rounded px-2 py-1 text-[10px] font-semibold text-white"
+                                                                style={{ backgroundColor: tipoBadgeColor }}
+                                                            >
+                                                                {tipoLabel}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-2.5 font-mono font-semibold" style={{ color: tipoBadgeColor }}>
+                                                            {doc.id ?? '—'}
                                                         </td>
                                                         <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
-                                                            {c.fecha ?? '—'}
+                                                            {doc.fecha ?? '—'}
                                                         </td>
                                                         <td className="px-4 py-2.5 text-[#1A1A18]">
-                                                            {c.cliente ?? '—'}
+                                                            {doc.cliente ?? '—'}
                                                         </td>
                                                         <td className="px-4 py-2.5 font-mono text-[#6B6B65]">
-                                                            {formatChileRutDisplay(c.rut)}
+                                                            {formatChileRutDisplay(doc.rut)}
                                                         </td>
                                                         <td className="px-4 py-2.5 text-right font-mono font-semibold text-[#1A1A18]">
-                                                            {typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}
+                                                            {typeof doc.monto === 'number' ? formatCLP(doc.monto) : '—'}
                                                         </td>
                                                         <td className="px-4 py-2.5 text-right font-mono text-[#6B6B65]">
                                                             {diasSinPago}
@@ -677,7 +772,7 @@ export default function ConciliacionesPage() {
                                 className="inline-block h-1.5 w-1.5 rounded-full bg-current"
                                 aria-hidden
                             />
-                            2 · Agente sugiere factura
+                            2 · Agente sugiere documento
                         </span>
                         <RightOutlined className="text-[#A8A8A2]" />
                         <span
@@ -855,19 +950,19 @@ export default function ConciliacionesPage() {
                             </span>
                         </div>
 
-                        {/* Cotización sugerida */}
+                        {/* Documentos sugeridos - Factura y Cotización */}
                         <section className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
                             <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
                                 <span className="flex items-center gap-1.5 text-[11.5px] font-bold uppercase tracking-wide text-[#1A1A18]">
                                     <FileTextOutlined />
-                                    Cotización sugerida
+                                    Documentos sugeridos
                                 </span>
                                 <span className="max-w-[55%] truncate text-right font-mono text-[11px] text-[#A8A8A2]">
                                     {rightTitle}
                                 </span>
                             </div>
 
-                            <div className="min-h-[min(52vh,560px)] p-4">
+                            <div className="min-h-[min(52vh,560px)] overflow-y-auto p-4">
                                 {!selectedRow ? (
                                     <div className="flex flex-col items-center px-6 py-14 text-center text-[#A8A8A2]">
                                         <FileTextOutlined
@@ -884,79 +979,85 @@ export default function ConciliacionesPage() {
                                     </div>
                                 ) : null}
 
-                                {selectedRow && sugerenciaSeed ? (
-                                    <div
-                                        className={[
-                                            'rounded-lg border border-[#BFDBFE] border-l-[3px] border-l-[#1D4ED8] bg-[#EFF6FF] p-4 transition-colors',
-                                            flashMatch ? '!border-[#22C55E] !bg-[#DCFCE7]' : '',
-                                        ].join(' ')}
-                                    >
-                                        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-                                            <div className="min-w-0">
-                                                <div className="mb-1.5 inline-block rounded border border-[#BFDBFE] bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8]">
-                                                    {sugerenciaSeed.id}
-                                                </div>
-                                                <div className="text-[13px] font-semibold text-[#1A1A18]">
-                                                    {sugerenciaSeed.cliente || '—'}
-                                                </div>
-                                                <div className="mt-0.5 font-mono text-[10.5px] font-medium text-[#6B6B65]">
-                                                    {formatChileRutDisplay(sugerenciaSeed.rut)}
-                                                </div>
-                                                <div className="mt-1 text-[10.5px] text-[#A8A8A2]">
-                                                    Emitida {formatCotizacionContable(sugerenciaSeed.fecha)}
-                                                </div>
-                                                <div className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#FDE68A] bg-[#FEF3C7] px-2 py-0.5 text-[10.5px] font-semibold text-[#B45309]">
-                                                    <span
-                                                        className="inline-block h-[5px] w-[5px] rounded-full bg-current"
-                                                        aria-hidden
+                                {selectedRow && (sugerenciaFactura || sugerenciaSeed) ? (
+                                    <div className="space-y-4">
+                                        {/* Factura sugerida */}
+                                        {sugerenciaFactura ? (
+                                            <div className="rounded-lg border border-[#86EFAC] border-l-[3px] border-l-[#16A34A] bg-[#F0FDF4] p-4">
+                                                <div className="mb-3 flex items-start gap-3">
+                                                    <input
+                                                        type="radio"
+                                                        id="doc-factura"
+                                                        name="doc-selection"
+                                                        value="factura"
+                                                        checked={docSeleccionado === 'factura'}
+                                                        onChange={(e) => setDocSeleccionado(e.target.value)}
+                                                        className="mt-1 cursor-pointer"
                                                     />
-                                                    Pendiente pago
+                                                    <label htmlFor="doc-factura" className="flex-1 cursor-pointer">
+                                                        <div className="mb-1.5 inline-block rounded border border-[#86EFAC] bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#16A34A]">
+                                                            FAC {sugerenciaFactura.id}
+                                                        </div>
+                                                        <div className="text-[13px] font-semibold text-[#1A1A18]">
+                                                            {sugerenciaFactura.cliente || '—'}
+                                                        </div>
+                                                        <div className="mt-0.5 font-mono text-[10.5px] font-medium text-[#6B6B65]">
+                                                            {formatChileRutDisplay(sugerenciaFactura.rut)}
+                                                        </div>
+                                                        <div className="mt-1 text-[10.5px] text-[#A8A8A2]">
+                                                            Emitida {formatCotizacionContable(sugerenciaFactura.fecha)}
+                                                        </div>
+                                                        <div className="mt-2 text-right">
+                                                            <div className="font-mono text-lg font-bold text-[#16A34A]">
+                                                                {typeof sugerenciaFactura.monto === 'number'
+                                                                    ? formatCLP(sugerenciaFactura.monto)
+                                                                    : '—'}
+                                                            </div>
+                                                        </div>
+                                                    </label>
                                                 </div>
                                             </div>
-                                            <div className="text-right">
-                                                <div className="font-mono text-lg font-bold text-[#1D4ED8]">
-                                                    {typeof sugerenciaSeed.monto === 'number'
-                                                        ? formatCLP(sugerenciaSeed.monto)
-                                                        : '—'}
+                                        ) : null}
+
+                                        {/* Cotización sugerida */}
+                                        {sugerenciaSeed ? (
+                                            <div className="rounded-lg border border-[#BFDBFE] border-l-[3px] border-l-[#1D4ED8] bg-[#EFF6FF] p-4">
+                                                <div className="mb-3 flex items-start gap-3">
+                                                    <input
+                                                        type="radio"
+                                                        id="doc-cotizacion"
+                                                        name="doc-selection"
+                                                        value="cotizacion"
+                                                        checked={docSeleccionado === 'cotizacion'}
+                                                        onChange={(e) => setDocSeleccionado(e.target.value)}
+                                                        className="mt-1 cursor-pointer"
+                                                    />
+                                                    <label htmlFor="doc-cotizacion" className="flex-1 cursor-pointer">
+                                                        <div className="mb-1.5 inline-block rounded border border-[#BFDBFE] bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8]">
+                                                            COT {sugerenciaSeed.id}
+                                                        </div>
+                                                        <div className="text-[13px] font-semibold text-[#1A1A18]">
+                                                            {sugerenciaSeed.cliente || '—'}
+                                                        </div>
+                                                        <div className="mt-0.5 font-mono text-[10.5px] font-medium text-[#6B6B65]">
+                                                            {formatChileRutDisplay(sugerenciaSeed.rut)}
+                                                        </div>
+                                                        <div className="mt-1 text-[10.5px] text-[#A8A8A2]">
+                                                            Emitida {formatCotizacionContable(sugerenciaSeed.fecha)}
+                                                        </div>
+                                                        <div className="mt-2 text-right">
+                                                            <div className="font-mono text-lg font-bold text-[#1D4ED8]">
+                                                                {typeof sugerenciaSeed.monto === 'number'
+                                                                    ? formatCLP(sugerenciaSeed.monto)
+                                                                    : '—'}
+                                                            </div>
+                                                        </div>
+                                                    </label>
                                                 </div>
-                                                <div className="mt-0.5 text-[10px] text-[#A8A8A2]">
-                                                    Total factura
-                                                </div>
                                             </div>
-                                        </div>
-                                        <div className="mt-2 border-t border-[#BFDBFE] pt-2.5">
-                                            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-[#A8A8A2]">
-                                                Ítems
-                                            </div>
-                                            <div className="space-y-0">
-                                                {(sugerenciaSeed.lineItems?.length
-                                                    ? sugerenciaSeed.lineItems
-                                                    : [
-                                                          {
-                                                              label:
-                                                                  sugerenciaSeed.descripcion ||
-                                                                  'Concepto',
-                                                              monto: sugerenciaSeed.monto,
-                                                          },
-                                                      ]
-                                                ).map((item, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        className="flex justify-between gap-3 border-b border-[#E4E4DF] py-1 text-[11.5px] text-[#6B6B65] last:border-b-0"
-                                                    >
-                                                        <span className="min-w-0 flex-1 truncate">
-                                                            {item.label}
-                                                        </span>
-                                                        <span className="shrink-0 font-mono font-medium text-[#1A1A18]">
-                                                            {typeof item.monto === 'number'
-                                                                ? formatCLP(item.monto)
-                                                                : '—'}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                                        ) : null}
+
+                                        <div className="flex flex-col gap-2 sm:flex-row">
                                             <Button
                                                 type="primary"
                                                 className="h-10 flex-1 border-none bg-[#1A6B3C] font-bold hover:!bg-[#2E9459]"
@@ -977,14 +1078,14 @@ export default function ConciliacionesPage() {
                                     </div>
                                 ) : null}
 
-                                {selectedRow && !sugerenciaSeed ? (
+                                {selectedRow && !sugerenciaFactura && !sugerenciaSeed ? (
                                     <div className="flex flex-col items-center px-6 py-14 text-center text-[#A8A8A2]">
                                         <FileTextOutlined
                                             className="mb-3.5 text-[52px] opacity-25"
                                         />
                                         <p className="max-w-sm text-[12.5px] leading-relaxed">
                                             <strong className="text-[#6B6B65]">
-                                                Sin factura encontrada
+                                                Sin documentos encontrados
                                             </strong>
                                             <br />
                                             El agente no encontró coincidencia por fecha contable

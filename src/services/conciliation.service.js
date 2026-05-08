@@ -23,6 +23,13 @@ class ConciliationService {
     }
 
     /**
+     * @param {{ since?: string, until?: string, page?: number, limit?: number }} params
+     */
+    listFacturas(params = {}) {
+        return instance.get('/conciliations/facturas', { params });
+    }
+
+    /**
      * @param {{ movement: object, cotizacion: object }} payload
      */
     saveConciliacion(payload) {
