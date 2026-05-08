@@ -103,11 +103,11 @@ export default function ConciliacionesPage() {
         [conciliaciones]
     );
     const conciliadasCotizacionIds = useMemo(
-        () => new Set(conciliaciones.filter((c) => c.document_type !== 'factura').map((c) => String(c.cotizacion_id))),
+        () => new Set(conciliaciones.filter((c) => (c.document_type ?? 'cotizacion') !== 'factura').map((c) => String(c.cotizacion_id)).filter(Boolean)),
         [conciliaciones]
     );
     const conciliadasFacturaIds = useMemo(
-        () => new Set(conciliaciones.filter((c) => c.document_type === 'factura').map((c) => String(c.factura_id))),
+        () => new Set(conciliaciones.filter((c) => (c.document_type ?? 'cotizacion') === 'factura').map((c) => String(c.factura_id)).filter(Boolean)),
         [conciliaciones]
     );
 
@@ -548,7 +548,8 @@ export default function ConciliacionesPage() {
                                         </thead>
                                         <tbody>
                                             {conciliaciones.map((c) => {
-                                                const isFactura = c.document_type === 'factura';
+                                                const docType = c.document_type ?? 'cotizacion';
+                                                const isFactura = docType === 'factura';
                                                 const docId = isFactura ? c.factura_id : c.cotizacion_id;
                                                 const docTypeLabel = isFactura ? 'FAC' : 'COT';
                                                 const docTypeColor = isFactura ? '#16A34A' : '#1D4ED8';
@@ -631,15 +632,16 @@ export default function ConciliacionesPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {noConciliadas.map((doc) => {
+                                            {noConciliadas.map((doc, idx) => {
                                                 const diasSinPago = dayjs().diff(dayjs(doc.fecha), 'day');
                                                 const estado = diasSinPago > 30 ? 'Vencida' : 'Sin pago';
                                                 const estadoColor = diasSinPago > 30 ? '#EA580C' : '#DC2626';
-                                                const isFactura = doc._type === 'factura';
+                                                const docType = doc._type ?? 'cotizacion';
+                                                const isFactura = docType === 'factura';
                                                 const tipoBadgeColor = isFactura ? '#16A34A' : '#1D4ED8';
                                                 const tipoLabel = isFactura ? 'FAC' : 'COT';
                                                 return (
-                                                    <tr key={`${doc._type}-${doc.id}`} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
+                                                    <tr key={`${docType}-${doc.id}-${idx}`} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
                                                         <td className="px-4 py-2.5">
                                                             <span
                                                                 className="inline-flex rounded px-2 py-1 text-[10px] font-semibold text-white"
