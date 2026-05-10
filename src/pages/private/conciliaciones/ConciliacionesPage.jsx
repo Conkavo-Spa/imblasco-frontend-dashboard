@@ -238,6 +238,19 @@ export default function ConciliacionesPage() {
         return result.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
     }, [facturas, cotizaciones, facturasNoId, cotizacionesNoId]);
 
+    // Sugerencias para detalle modal
+    const detalleFactura = useMemo(() => {
+        if (!detalleRow) return null;
+        const nf = Array.isArray(facturas) ? facturas.filter((f) => !facturasNoId.has(f.id)) : [];
+        return matchMovementToSeed(detalleRow, nf);
+    }, [detalleRow, facturas, facturasNoId]);
+
+    const detalleSeed = useMemo(() => {
+        if (!detalleRow) return null;
+        const nc = Array.isArray(cotizaciones) ? cotizaciones.filter((c) => !cotizacionesNoId.has(c.id)) : [];
+        return matchMovementToSeed(detalleRow, nc);
+    }, [detalleRow, cotizaciones, cotizacionesNoId]);
+
     // Handlers
     const handleSelectRow = useCallback((row) => {
         setSelectedMovementId(row.id);
@@ -601,7 +614,34 @@ export default function ConciliacionesPage() {
                         </Col>
                         <Col xs={24} md={12} className="md:border-l md:border-[#1A6B3C]/15 md:pl-6">
                             <h3 className="mb-3 border-b border-[#1A6B3C]/20 pb-2 text-sm font-bold text-[#1A6B3C]">Documento</h3>
-                            {cotizacionRow ? <Descriptions size="small" column={1} bordered><Descriptions.Item label="ID">{dash(cotizacionRow.id)}</Descriptions.Item><Descriptions.Item label="Cliente">{dash(cotizacionRow.cliente)}</Descriptions.Item><Descriptions.Item label="Monto">{typeof cotizacionRow.monto === 'number' ? formatCLP(cotizacionRow.monto) : '—'}</Descriptions.Item></Descriptions> : <p className="text-sm text-[#A8A8A2]">Sin información</p>}
+                            {cotizacionRow ? (
+                                <Descriptions size="small" column={1} bordered>
+                                    <Descriptions.Item label="ID">{dash(cotizacionRow.id)}</Descriptions.Item>
+                                    <Descriptions.Item label="Cliente">{dash(cotizacionRow.cliente)}</Descriptions.Item>
+                                    <Descriptions.Item label="Monto">{typeof cotizacionRow.monto === 'number' ? formatCLP(cotizacionRow.monto) : '—'}</Descriptions.Item>
+                                </Descriptions>
+                            ) : detalleFactura || detalleSeed ? (
+                                <div className="space-y-3">
+                                    {detalleFactura && (
+                                        <div className="rounded-lg border border-[#86EFAC] bg-[#F0FDF4] p-3">
+                                            <div className="mb-2 inline-block rounded border border-[#86EFAC] bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#16A34A]">FAC {detalleFactura.id}</div>
+                                            <div className="text-sm font-semibold text-[#1A1A18]">{detalleFactura.cliente || '—'}</div>
+                                            <div className="mt-1 font-mono text-[11px] text-[#6B6B65]">{formatChileRutDisplay(detalleFactura.rut)}</div>
+                                            <div className="mt-1 font-mono text-sm font-bold text-[#16A34A]">{typeof detalleFactura.monto === 'number' ? formatCLP(detalleFactura.monto) : '—'}</div>
+                                        </div>
+                                    )}
+                                    {detalleSeed && (
+                                        <div className="rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] p-3">
+                                            <div className="mb-2 inline-block rounded border border-[#BFDBFE] bg-white px-2 py-0.5 font-mono text-xs font-bold text-[#1D4ED8]">COT {detalleSeed.id}</div>
+                                            <div className="text-sm font-semibold text-[#1A1A18]">{detalleSeed.cliente || '—'}</div>
+                                            <div className="mt-1 font-mono text-[11px] text-[#6B6B65]">{formatChileRutDisplay(detalleSeed.rut)}</div>
+                                            <div className="mt-1 font-mono text-sm font-bold text-[#1D4ED8]">{typeof detalleSeed.monto === 'number' ? formatCLP(detalleSeed.monto) : '—'}</div>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-[#A8A8A2]">Sin información</p>
+                            )}
                         </Col>
                     </Row>
                 )}
