@@ -632,7 +632,7 @@ export default function ConciliacionesPage() {
                                         )}
 
                                         <div className="flex flex-col gap-2 sm:flex-row">
-                                            <Button type="primary" className="h-10 flex-1 border-none bg-[#1D4ED8] font-bold" icon={<CheckCircleOutlined />} loading={conciliandoId === selectedRow.id} disabled={conciliandoId !== null && conciliandoId !== selectedRow.id} onClick={handleConciliar}>
+                                            <Button type="primary" className="h-10 flex-1 border-none bg-[#1D4ED8] text-white font-bold" icon={<CheckCircleOutlined />} loading={conciliandoId === selectedRow.id} disabled={conciliandoId !== null && conciliandoId !== selectedRow.id} onClick={handleConciliar}>
                                                 Conciliar
                                             </Button>
                                             <Button onClick={() => setDetalleRow(selectedRow)}>Ver detalle</Button>
