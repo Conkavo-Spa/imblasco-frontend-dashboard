@@ -409,7 +409,7 @@ export default function ConciliacionesPage() {
                                         const dt = c.document_type ?? 'cotizacion';
                                         const isF = dt === 'factura';
                                         return (
-                                            <tr key={c._id} onClick={() => handleOpenModalDetalle(c)} className="cursor-pointer border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
+                                            <tr key={c._id} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
                                                 <td className="px-4 py-2.5 font-mono text-[#6B6B65]">{c.fecha_movimiento ?? '—'}</td>
                                                 <td className="px-4 py-2.5 text-[#6B6B65]">{c.bank_name ?? '—'}</td>
                                                 <td className="px-4 py-2.5"><span className="inline-flex rounded px-2 py-1 text-[10px] font-semibold text-white" style={{ backgroundColor: isF ? '#16A34A' : '#1D4ED8' }}>{isF ? 'FAC' : 'COT'}</span></td>
@@ -419,7 +419,7 @@ export default function ConciliacionesPage() {
                                                 <td className="px-4 py-2.5 text-right font-mono font-semibold">{typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-[#A8A8A2]">{c.createdAt ? new Date(c.createdAt).toLocaleString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-center">
-                                                    <button type="button" onClick={() => handleOpenModalDetalle(c)} className="inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[#1A6B3C] hover:bg-[#155630]">
+                                                    <button type="button" onClick={() => setDetalleRow(c)} className="inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[#1A6B3C] hover:bg-[#155630]">
                                                         <RightOutlined className="mr-1" />
                                                         Detalle
                                                     </button>
