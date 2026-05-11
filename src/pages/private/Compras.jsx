@@ -65,7 +65,8 @@ const ESTADOS = {
 
 const FILTROS_ESTADO = [
     { key: 'todos',      label: 'Todos' },
-    { key: 'enDisputa',  label: 'En disputa',  color: 'text-yellow-600' },
+    { key: 'pendiente',  label: 'Pendientes',   color: 'text-gray-500'   },
+    { key: 'enDisputa',  label: 'En disputa',   color: 'text-yellow-600' },
     { key: 'confirmado', label: 'Confirmados',  color: 'text-green-600'  },
     { key: 'embarcado',  label: 'Embarcados',   color: 'text-blue-600'   },
     { key: 'incompleto', label: 'Incompleto',   color: 'text-orange-600' },
@@ -79,6 +80,8 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
     const [busqueda, setBusqueda] = useState('');
     const [filtroEstado, setFiltroEstado] = useState('todos');
     const [paginaActual, setPaginaActual] = useState(1);
+    const [incompletoModal, setIncompletoModal] = useState(null); // { pedido, cod, cantidad }
+    const [cantidadInput, setCantidadInput] = useState('');
     const PEDIDOS_POR_PAGINA = 10;
 
     const pedidosFiltrados = useMemo(() => {
@@ -90,7 +93,9 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
         );
         if (filtroEstado !== 'todos') {
             filtrados = filtrados.filter(p =>
-                p.productos.some(x => (x.estado ?? 'pendiente') === filtroEstado)
+                filtroEstado === 'pendiente'
+                    ? p.productos.some(x => ['pendiente', 'incompleto'].includes(x.estado ?? 'pendiente'))
+                    : p.productos.some(x => (x.estado ?? 'pendiente') === filtroEstado)
             );
         }
         return filtrados;
@@ -115,6 +120,28 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
             await pedidosApi.actualizarProductos(pedido._id, actualizados);
             await refetch();
             onEmbarcadoChange?.();
+        } catch {
+            message.error('No se pudo actualizar el estado.');
+        } finally {
+            setGuardando(null);
+        }
+    };
+
+    const marcarIncompleto = async () => {
+        const { pedido, cod } = incompletoModal;
+        const recibida = Number(cantidadInput);
+        const prod = pedido.productos.find(p => p.cod === cod);
+        if (!prod || recibida <= 0 || recibida >= prod.cantidad) return;
+        setGuardando(pedido._id + cod);
+        try {
+            const actualizados = pedido.productos.map(p =>
+                p.cod !== cod ? p : { ...p, estado: 'incompleto', cantidadRecibida: recibida }
+            );
+            await pedidosApi.actualizarProductos(pedido._id, actualizados);
+            await refetch();
+            onEmbarcadoChange?.();
+            setIncompletoModal(null);
+            setCantidadInput('');
         } catch {
             message.error('No se pudo actualizar el estado.');
         } finally {
@@ -159,6 +186,10 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
     };
 
     if (loading) return <div className="flex justify-center py-16"><Spin /></div>;
+
+    const modalMaxCantidad = incompletoModal ? incompletoModal.cantidad : 0;
+    const modalVal = Number(cantidadInput);
+    const modalOkDisabled = !cantidadInput || modalVal <= 0 || modalVal >= modalMaxCantidad;
 
     return (
         <div className="flex flex-col gap-4 pb-5">
@@ -222,7 +253,7 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                                         {p.productos.length} productos · {(p.totalUnidades ?? 0).toLocaleString('es-CL')} uds.
                                     </span>
                                     {tieneDisputa    && <Tag color="warning">En disputa</Tag>}
-                                    {tieneConfirm    && <Tag color="success">Confirmado</Tag>}
+                                    {tieneConfirm    && <Tag color="success">X Embarcar</Tag>}
                                     {tieneEmbarcado  && <Tag color="processing">Embarcado</Tag>}
                                     {tieneIncompleto && <Tag color="orange">Incompleto</Tag>}
                                     {tieneRecibido   && <Tag color="purple">Recibido</Tag>}
@@ -303,6 +334,32 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                                                         { active: 'text-green-500 bg-green-100 hover:bg-green-200', idle: 'text-gray-300 hover:text-green-500 hover:bg-green-50' })}
                                                     {btn('embarcado',  <span title="Embarcado">🚢</span>, 'Embarcado',
                                                         { active: 'text-blue-500 bg-blue-100 hover:bg-blue-200', idle: 'text-gray-300 hover:text-blue-500 hover:bg-blue-50' })}
+                                                    {/* Incompleto: solo habilitado cuando está embarcado */}
+                                                    <button
+                                                        onClick={() => { setIncompletoModal({ pedido: p, cod: prod.cod, cantidad: prod.cantidad }); setCantidadInput(''); }}
+                                                        disabled={busy || estado !== 'embarcado'}
+                                                        title={estado === 'incompleto' ? 'Recibido parcialmente' : estado !== 'embarcado' ? 'Solo disponible en estado Embarcado' : 'Marcar recepción parcial'}
+                                                        className={`shrink-0 rounded-md p-1.5 transition-colors text-base leading-none
+                                                            ${estado === 'incompleto'
+                                                                ? 'text-orange-500 bg-orange-100'
+                                                                : 'text-gray-300 hover:text-orange-500 hover:bg-orange-50'}
+                                                            disabled:opacity-40 disabled:cursor-not-allowed`}
+                                                    >
+                                                        ⚠️
+                                                    </button>
+                                                    {/* Recibido: solo habilitado cuando está embarcado */}
+                                                    <button
+                                                        onClick={() => cambiarEstado(p, prod.cod, 'recibido')}
+                                                        disabled={busy || estado !== 'embarcado'}
+                                                        title={estado === 'recibido' ? 'Recibido completo' : estado !== 'embarcado' ? 'Solo disponible en estado Embarcado' : 'Marcar como recibido'}
+                                                        className={`shrink-0 rounded-md p-1.5 transition-colors text-base leading-none
+                                                            ${estado === 'recibido'
+                                                                ? 'text-purple-500 bg-purple-100'
+                                                                : 'text-gray-300 hover:text-purple-500 hover:bg-purple-50'}
+                                                            disabled:opacity-40 disabled:cursor-not-allowed`}
+                                                    >
+                                                        ✅
+                                                    </button>
                                                 </div>
                                             </div>
                                         );
@@ -326,6 +383,44 @@ function HistorialTab({ pedidos, loading, refetch, onEmbarcadoChange }) {
                 )}
                 </>
             )}
+            {/* Modal recepción parcial */}
+            <Modal
+                open={!!incompletoModal}
+                title="Recepción parcial"
+                okText="Confirmar"
+                cancelText="Cancelar"
+                onCancel={() => { setIncompletoModal(null); setCantidadInput(''); }}
+                onOk={marcarIncompleto}
+                okButtonProps={{ disabled: modalOkDisabled, loading: !!guardando }}
+                destroyOnClose
+            >
+                {incompletoModal && (
+                    <div className="flex flex-col gap-3 py-2">
+                        <p className="text-sm text-gray-600">
+                            <span className="font-semibold text-[#121027]">{incompletoModal.cod}</span>
+                            {' — '}Total pedido: <span className="font-semibold">{incompletoModal.cantidad.toLocaleString('es-CL')} uds.</span>
+                        </p>
+                        <p className="text-sm text-gray-500">¿Cuántas unidades llegaron efectivamente?</p>
+                        <Input
+                            type="number"
+                            min={1}
+                            max={incompletoModal.cantidad - 1}
+                            value={cantidadInput}
+                            onChange={e => setCantidadInput(e.target.value)}
+                            placeholder={`Ingresa un número entre 1 y ${incompletoModal.cantidad - 1}`}
+                            autoFocus
+                            onPressEnter={() => {
+                                if (!modalOkDisabled) marcarIncompleto();
+                            }}
+                        />
+                        {!modalOkDisabled && (
+                            <p className="text-xs text-orange-500 font-semibold">
+                                Faltante: {(incompletoModal.cantidad - modalVal).toLocaleString('es-CL')} uds.
+                            </p>
+                        )}
+                    </div>
+                )}
+            </Modal>
         </div>
     );
 }
