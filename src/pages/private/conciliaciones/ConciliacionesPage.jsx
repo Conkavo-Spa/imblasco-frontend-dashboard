@@ -112,6 +112,7 @@ export default function ConciliacionesPage() {
     const [flowStep, setFlowStep] = useState(1);
     const [flashMatch, setFlashMatch] = useState(false);
     const [detalleRow, setDetalleRow] = useState(null);
+    const [detalleConciliacionHistorial, setDetalleConciliacionHistorial] = useState(null);
     const [modalConciliacion, setModalConciliacion] = useState(null);
     const [detalleProductos, setDetalleProductos] = useState(null);
     const [loadingDetalle, setLoadingDetalle] = useState(false);
@@ -318,6 +319,7 @@ export default function ConciliacionesPage() {
     }, [dateRange, setRange]);
 
     const handleDetalleHistorial = useCallback((conciliacion) => {
+        setDetalleConciliacionHistorial(conciliacion);
         const foundMovement = movements?.find(m => m.id === conciliacion.movement_id);
         if (foundMovement) {
             setDetalleRow(foundMovement);
@@ -360,7 +362,20 @@ export default function ConciliacionesPage() {
     const rightTitle = !selectedRow ? '— Selecciona una transferencia' : sugerenciaFactura || sugerenciaSeed ? `${(sugerenciaFactura ? 1 : 0) + (sugerenciaSeed ? 1 : 0)} coincidencia${sugerenciaFactura && sugerenciaSeed ? 's' : ''}` : '— Sin coincidencia';
 
     const detalle = detalleRow;
-    const cotizacionRow = detalle?.cotizacion ?? null;
+    let cotizacionRow = detalle?.cotizacion ?? null;
+
+    if (!cotizacionRow && detalleConciliacionHistorial) {
+        const dt = detalleConciliacionHistorial.document_type ?? 'cotizacion';
+        const docId = dt === 'factura' ? detalleConciliacionHistorial.factura_id : detalleConciliacionHistorial.cotizacion_id;
+        if (docId) {
+            cotizacionRow = {
+                id: docId,
+                cliente: detalleConciliacionHistorial.cliente ?? '—',
+                monto: detalleConciliacionHistorial.monto ?? null,
+            };
+        }
+    }
+
     const sourceAccount = detalle ? mergeMovementCounterparty(detalle.sender_account, detalle.recipient_account) : null;
 
     return (
@@ -622,7 +637,7 @@ export default function ConciliacionesPage() {
                 </>
             )}
 
-            <Modal title={detalle ? `Transferencia${detalle.id ? ` · ${detalle.id}` : ''}` : 'Detalle'} open={!!detalle} onCancel={() => setDetalleRow(null)} footer={null} width={880} styles={{ body: { paddingTop: 12 } }}>
+            <Modal title={detalle ? `Transferencia${detalle.id ? ` · ${detalle.id}` : ''}` : 'Detalle'} open={!!detalle} onCancel={() => { setDetalleRow(null); setDetalleConciliacionHistorial(null); }} footer={null} width={880} styles={{ body: { paddingTop: 12 } }}>
                 {detalle && (
                     <Row gutter={[24, 24]}>
                         <Col xs={24} md={12}>
