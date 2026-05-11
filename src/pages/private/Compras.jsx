@@ -1316,9 +1316,12 @@ export default function Compras() {
             await comprasApi.triggerSyncStock();
         } catch (err) {
             if (err.response?.status === 409) {
-                message.info('Ya hay una sincronización en curso. Espera un momento.');
+                message.warning({
+                    content: 'Hay una sincronización pendiente. El demonio aún no la procesó — espera o reinicia el demonio.',
+                    duration: 8,
+                });
             } else {
-                message.error('No se pudo iniciar la sincronización.');
+                message.error({ content: 'No se pudo iniciar la sincronización.', duration: 8 });
             }
             stopSync();
             return;
@@ -1329,7 +1332,7 @@ export default function Compras() {
         syncPollRef.current = setInterval(async () => {
             if (Date.now() - startedAt > TIMEOUT_MS) {
                 stopSync();
-                message.error('La sincronización tardó demasiado. Verifica el estado del demonio.');
+                message.error({ content: 'El demonio no respondió en 10 minutos. Verifica que esté corriendo y procesando SyncTriggers.', duration: 10 });
                 return;
             }
             try {
@@ -1340,11 +1343,11 @@ export default function Compras() {
                     refetchProductos();
                 } else if (status === 'error') {
                     stopSync();
-                    message.error('El demonio reportó un error al sincronizar.');
+                    message.error({ content: 'El demonio reportó un error al sincronizar.', duration: 8 });
                 }
             } catch {
                 stopSync();
-                message.error('Error al consultar el estado de la sincronización.');
+                message.error({ content: 'Error al consultar el estado de la sincronización.', duration: 8 });
             }
         }, 3000);
     }, [refetchProductos, stopSync]);
@@ -1682,12 +1685,8 @@ export default function Compras() {
         if (searchQuery.trim()) {
             return { text: `${filasFiltradas.length} resultado${filasFiltradas.length !== 1 ? 's' : ''}`, sub: `para "${searchQuery.trim()}"` };
         }
-        const prioritarios  = filasFiltradas.filter(p => !p.descartado).length;
-        const descartadosN  = filasFiltradas.filter(p =>  p.descartado).length;
-        const sub = descartadosN > 0
-            ? `según stock y proyección · ${descartadosN} descartado${descartadosN !== 1 ? 's' : ''} al final`
-            : 'según stock y proyección';
-        return { text: `${prioritarios} producto${prioritarios !== 1 ? 's' : ''} a pedir`, sub };
+        const prioritarios = filasFiltradas.filter(p => !p.descartado).length;
+        return { text: `${prioritarios} producto${prioritarios !== 1 ? 's' : ''} a pedir`, sub: 'según stock y proyección' };
     }, [searchQuery, filasFiltradas]);
 
     // ── Render ────────────────────────────────────────────────────────────────
