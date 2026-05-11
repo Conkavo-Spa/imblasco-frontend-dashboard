@@ -1123,11 +1123,12 @@ export default function Compras() {
     }, [searchQuery, searchResults, filas, categoriaSeleccionada]);
 
     const [sortXEmbarcar, setSortXEmbarcar] = useState(false);
+    const [sortEmbarcado, setSortEmbarcado] = useState(false);
     const [stockSort, setStockSort] = useState(null);      // null | 'desc' | 'asc'
     const [sugerenciaSort, setSugerenciaSort] = useState(null); // null | 'desc' | 'asc'
     const [soloEnCarrito, setSoloEnCarrito] = useState(false);
 
-    const resetSorts = () => { setStockSort(null); setSugerenciaSort(null); setSortXEmbarcar(false); };
+    const resetSorts = () => { setStockSort(null); setSugerenciaSort(null); setSortXEmbarcar(false); setSortEmbarcado(false); };
 
     const filasOrdenadas = useMemo(() => {
         if (stockSort) {
@@ -1151,8 +1152,13 @@ export default function Compras() {
                 return tb - ta;
             });
         }
+        if (sortEmbarcado) {
+            return [...filasFiltradas].sort((a, b) =>
+                (embarcados[b.cod] ?? 0) - (embarcados[a.cod] ?? 0)
+            );
+        }
         return filasFiltradas;
-    }, [filasFiltradas, sortXEmbarcar, stockSort, sugerenciaSort, confirmados]);
+    }, [filasFiltradas, sortXEmbarcar, sortEmbarcado, stockSort, sugerenciaSort, confirmados, embarcados]);
 
     const filasVisibles = useMemo(() => {
         if (!soloEnCarrito) return filasOrdenadas;
@@ -1495,7 +1501,15 @@ export default function Compras() {
             },
         },
         {
-            title: 'Embarcado',
+            title: (
+                <div
+                    className="flex items-center justify-end gap-1 cursor-pointer select-none"
+                    onClick={() => { const next = !sortEmbarcado; resetSorts(); setSortEmbarcado(next); }}
+                >
+                    <span>Embarcado</span>
+                    <ArrowUpOutlined style={{ fontSize: 10, color: sortEmbarcado ? '#370776' : '#9ca3af' }} />
+                </div>
+            ),
             key: 'embarcado', width: 92, align: 'right',
             render: (_, record) => {
                 const val = embarcados[record.cod] ?? 0;
