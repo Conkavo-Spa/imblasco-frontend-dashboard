@@ -348,7 +348,6 @@ function getCategoriaDeProducto(p) {
 
 const CATEGORIAS = [
     { key: 'todos',         label: 'Todos' },
-    { key: 'masVendidos',   label: 'Más vendidos' },
     { key: 'trofeos',       label: 'Trofeos y Premios' },
     { key: 'publicitarios', label: 'Artículos Publicitarios' },
     { key: 'pesca',         label: 'Pesca' },
@@ -1107,7 +1106,7 @@ export default function Compras() {
     // ── Conteo por categoría (sobre la lista base, sin filtro de búsqueda) ──
     const countsPorCategoria = useMemo(() => {
         const base = filas ?? [];
-        const counts = { todos: 0, masVendidos: Math.min(50, base.length), trofeos: 0, publicitarios: 0, pesca: 0, timbres: 0, otros: 0 };
+        const counts = { todos: 0, trofeos: 0, publicitarios: 0, pesca: 0, timbres: 0, otros: 0 };
         base.forEach(p => {
             counts.todos++;
             const cat = getCategoriaDeProducto(p);
@@ -1120,15 +1119,6 @@ export default function Compras() {
     const filasFiltradas = useMemo(() => {
         const base = searchQuery.trim() ? searchResults : (filas ?? []);
         if (categoriaSeleccionada === 'todos') return base;
-        if (categoriaSeleccionada === 'masVendidos') {
-            return [...base]
-                .sort((a, b) => {
-                    const tA = (a[`y${CY-3}`] ?? 0) + (a[`y${CY-2}`] ?? 0) + (a[`y${CY-1}`] ?? 0) + (a[`y${CY}`] ?? 0);
-                    const tB = (b[`y${CY-3}`] ?? 0) + (b[`y${CY-2}`] ?? 0) + (b[`y${CY-1}`] ?? 0) + (b[`y${CY}`] ?? 0);
-                    return tB - tA;
-                })
-                .slice(0, 50);
-        }
         return base.filter(p => getCategoriaDeProducto(p) === categoriaSeleccionada);
     }, [searchQuery, searchResults, filas, categoriaSeleccionada]);
 
@@ -1301,7 +1291,7 @@ export default function Compras() {
             setPedidoInfo(prev => ({ ...prev, ...nuevaInfo }));
         };
 
-        if (categoriaSeleccionada === 'todos' || categoriaSeleccionada === 'masVendidos') {
+        if (categoriaSeleccionada === 'todos') {
             Modal.confirm({
                 title: 'Aplicar todas las sugerencias',
                 content: `Se llenarán los campos "A pedir" de los ${fuenteSugerencias.length} productos visibles con sus sugerencias.`,
@@ -1426,16 +1416,9 @@ export default function Compras() {
         {
             title: 'Producto',
             dataIndex: 'nombre', key: 'nombre', width: 220,
-            render: (val, record) => (
+            render: (val) => (
                 <Tooltip title={val} placement="topLeft" mouseEnterDelay={0.5}>
-                    <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`text-sm font-medium leading-tight truncate ${record.descartado ? 'text-gray-400' : 'text-[#121027]'}`}>{val}</span>
-                        {record.descartado && (
-                            <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', flexShrink: 0, marginInlineEnd: 0 }}>
-                                Descartado
-                            </Tag>
-                        )}
-                    </div>
+                    <span className="text-sm font-medium leading-tight truncate text-[#121027]">{val}</span>
                 </Tooltip>
             ),
         },
@@ -1666,10 +1649,10 @@ export default function Compras() {
                                                     }
                                                 >
                                                     {sugerenciasAplicadas
-                                                        ? (categoriaSeleccionada === 'todos' || categoriaSeleccionada === 'masVendidos'
+                                                        ? (categoriaSeleccionada === 'todos'
                                                             ? 'Quitar todas las sugerencias'
                                                             : `Quitar sugerencias — ${CATEGORIAS.find(c => c.key === categoriaSeleccionada)?.label}`)
-                                                        : (categoriaSeleccionada === 'todos' || categoriaSeleccionada === 'masVendidos'
+                                                        : (categoriaSeleccionada === 'todos'
                                                             ? 'Aplicar todas las sugerencias'
                                                             : `Aplicar sugerencias — ${CATEGORIAS.find(c => c.key === categoriaSeleccionada)?.label}`)
                                                     }
@@ -1803,7 +1786,6 @@ export default function Compras() {
                                                     onRow={() => ({ style: { cursor: 'default' } })}
                                                     rowClassName={(record) => {
                                                         if (pedidoCods.includes(record.cod)) return '!bg-[#e8dcff] hover:!bg-[#ddd0ff]';
-                                                        if (record.descartado) return '!bg-gray-50 opacity-60 hover:!opacity-100';
                                                         return 'hover:bg-[#f6f2ff]';
                                                     }}
                                                 />
@@ -1919,8 +1901,7 @@ export default function Compras() {
                                 <div className="flex flex-col gap-0.5 flex-1 min-w-0">
                                     <span className="text-xs text-gray-400 font-semibold">{p.cod}</span>
                                     <div className="flex items-center gap-1.5">
-                                        <span className={`text-sm font-medium leading-tight ${p.descartado ? 'text-gray-400' : 'text-[#121027]'}`}>{p.nombre}</span>
-                                        {p.descartado && <Tag style={{ fontSize: 10, lineHeight: '16px', padding: '0 4px', flexShrink: 0, marginInlineEnd: 0 }}>Descartado</Tag>}
+                                        <span className="text-sm font-medium leading-tight text-[#121027]">{p.nombre}</span>
                                     </div>
                                 </div>
                                 <input
