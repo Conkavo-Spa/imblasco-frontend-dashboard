@@ -317,6 +317,21 @@ export default function ConciliacionesPage() {
         setRange(dateRange[0].format('YYYY-MM-DD'), d.format('YYYY-MM-DD'));
     }, [dateRange, setRange]);
 
+    const handleDetalleHistorial = useCallback((conciliacion) => {
+        const foundMovement = movements?.find(m => m.id === conciliacion.movement_id);
+        if (foundMovement) {
+            setDetalleRow(foundMovement);
+        } else {
+            setDetalleRow({
+                id: conciliacion.movement_id ?? conciliacion._id ?? '—',
+                amount: conciliacion.monto ?? null,
+                currency: 'CLP',
+                post_date: conciliacion.fecha_movimiento ?? null,
+                type: conciliacion.type ?? 'transfer',
+            });
+        }
+    }, [movements]);
+
     const handleOpenModalDetalle = useCallback(async (conciliacion) => {
         setModalConciliacion(conciliacion);
         setDetalleProductos(null);
@@ -419,7 +434,7 @@ export default function ConciliacionesPage() {
                                                 <td className="px-4 py-2.5 text-right font-mono font-semibold">{typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-[#A8A8A2]">{c.createdAt ? new Date(c.createdAt).toLocaleString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-center">
-                                                    <button type="button" onClick={() => setDetalleRow(c)} className="inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[#1A6B3C] hover:bg-[#155630]">
+                                                    <button type="button" onClick={() => handleDetalleHistorial(c)} className="inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[#1A6B3C] hover:bg-[#155630]">
                                                         <RightOutlined className="mr-1" />
                                                         Detalle
                                                     </button>
