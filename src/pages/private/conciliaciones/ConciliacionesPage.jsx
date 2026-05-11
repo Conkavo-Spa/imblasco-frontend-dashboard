@@ -401,6 +401,7 @@ export default function ConciliacionesPage() {
                                         <th className="px-4 py-2">RUT</th>
                                         <th className="px-4 py-2 text-right">Monto</th>
                                         <th className="px-4 py-2">Fecha</th>
+                                        <th className="px-4 py-2 text-center">Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -417,6 +418,12 @@ export default function ConciliacionesPage() {
                                                 <td className="px-4 py-2.5 font-mono text-[#6B6B65]">{formatChileRutDisplay(c.rut)}</td>
                                                 <td className="px-4 py-2.5 text-right font-mono font-semibold">{typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-[#A8A8A2]">{c.createdAt ? new Date(c.createdAt).toLocaleString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+                                                <td className="px-4 py-2.5 text-center">
+                                                    <button type="button" onClick={() => handleOpenModalDetalle(c)} className="inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[#1A6B3C] hover:bg-[#155630]">
+                                                        <RightOutlined className="mr-1" />
+                                                        Detalle
+                                                    </button>
+                                                </td>
                                             </tr>
                                         );
                                     })}
