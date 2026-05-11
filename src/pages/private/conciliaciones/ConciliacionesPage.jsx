@@ -6,6 +6,7 @@ import {
     BankOutlined,
     CheckCircleOutlined,
     RightOutlined,
+    DownloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useMediaQuery } from 'react-responsive';
@@ -23,6 +24,7 @@ import {
 import { filterTransferenciaRows } from '../../../lib/conciliation/filterTransferenciaRows';
 import { formatCLP } from '../../../utils/formatCLP';
 import { formatChileRutDisplay } from '../../../lib/conciliation/formatChileRutDisplay';
+import { exportConciliacionesCSV } from '../../../utils/exportConciliacionesCSV';
 import ConciliacionesFilters from './ConciliacionesFilters';
 import conciliationApi from '../../../services/conciliation.service';
 import { SEED_IDS_PRECONCILIADAS_DEMO } from './conciliacionDemo.constants';
@@ -415,8 +417,14 @@ export default function ConciliacionesPage() {
             {mainTab === 'historial' && (
                 <div className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
                     <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
-                        <span className="text-[11.5px] font-bold uppercase text-[#1A1A18]">Transferencias conciliadas</span>
-                        <span className="font-mono text-[11px] text-[#A8A8A2]">{conciliaciones.length} registros</span>
+                        <div className="flex items-center gap-4">
+                            <span className="text-[11.5px] font-bold uppercase text-[#1A1A18]">Transferencias conciliadas</span>
+                            <span className="font-mono text-[11px] text-[#A8A8A2]">{conciliaciones.length} registros</span>
+                        </div>
+                        <button type="button" onClick={() => exportConciliacionesCSV(conciliaciones)} className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-semibold text-white transition-colors bg-[#1A6B3C] hover:bg-[#155630]">
+                            <DownloadOutlined />
+                            Descargar CSV
+                        </button>
                     </div>
                     {loadingHistorial ? <div className="p-8 text-center text-sm text-[#6B6B65]">Cargando…</div> : conciliaciones.length === 0 ? <div className="p-10 text-center text-sm text-[#6B6B65]">Sin conciliaciones.</div> : (
                         <div className="overflow-x-auto">
