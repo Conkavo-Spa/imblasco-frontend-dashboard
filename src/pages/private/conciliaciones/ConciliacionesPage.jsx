@@ -421,7 +421,7 @@ export default function ConciliacionesPage() {
                             <span className="text-[11.5px] font-bold uppercase text-[#1A1A18]">Transferencias conciliadas</span>
                             <span className="font-mono text-[11px] text-[#A8A8A2]">{conciliaciones.length} registros</span>
                         </div>
-                        <button type="button" onClick={() => exportConciliacionesCSV(conciliaciones)} className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-semibold text-white transition-colors bg-[#1A6B3C] hover:bg-[#155630]">
+                        <button type="button" onClick={() => exportConciliacionesCSV(conciliaciones)} className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-semibold text-white transition-colors bg-[#1D4ED8] hover:bg-[#1E40AF]">
                             <DownloadOutlined />
                             Descargar CSV
                         </button>
@@ -457,7 +457,7 @@ export default function ConciliacionesPage() {
                                                 <td className="px-4 py-2.5 text-right font-mono font-semibold">{typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-[#A8A8A2]">{c.createdAt ? new Date(c.createdAt).toLocaleString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-center">
-                                                    <button type="button" onClick={() => handleDetalleHistorial(c)} className="inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[#1A6B3C] hover:bg-[#155630]">
+                                                    <button type="button" onClick={() => handleDetalleHistorial(c)} className="inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[#1D4ED8] hover:bg-[#1E40AF]">
                                                         <RightOutlined className="mr-1" />
                                                         Detalle
                                                     </button>
@@ -563,7 +563,7 @@ export default function ConciliacionesPage() {
                             <div className="max-h-[min(52vh,560px)] overflow-y-auto">
                                 {loading && !pendientesLista.length ? <div className="p-8 text-center text-sm text-[#6B6B65]">Cargando…</div> : pendientesLista.length === 0 ? <div className="p-10 text-center text-sm text-[#6B6B65]">Sin transferencias.</div> : pendientesLista.map((row) => (
                                     <button key={row.id} type="button" onClick={() => handleSelectRow(row)} className={`flex w-full items-center gap-3 border-b border-[#E4E4DF] px-4 py-3 text-left transition-colors border-l-[3px] ${selectedMovementId === row.id ? 'border-l-[#1A6B3C] bg-[#EAF5EE]' : 'border-l-transparent hover:bg-[#F5F5F2]'}`}>
-                                        <div className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${selectedMovementId === row.id ? 'bg-[#1A6B3C] text-white' : 'bg-[#E4E4DF] text-[#6B6B65]'}`}>
+                                        <div className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${selectedMovementId === row.id ? 'bg-[#1D4ED8] text-white' : 'bg-[#E4E4DF] text-[#6B6B65]'}`}>
                                             {initialsFromName(row.counterpartyName)}
                                         </div>
                                         <div className="min-w-0 flex-1">
@@ -632,7 +632,7 @@ export default function ConciliacionesPage() {
                                         )}
 
                                         <div className="flex flex-col gap-2 sm:flex-row">
-                                            <Button type="primary" className="h-10 flex-1 border-none bg-[#1A6B3C] font-bold" icon={<CheckCircleOutlined />} loading={conciliandoId === selectedRow.id} disabled={conciliandoId !== null && conciliandoId !== selectedRow.id} onClick={handleConciliar}>
+                                            <Button type="primary" className="h-10 flex-1 border-none bg-[#1D4ED8] font-bold" icon={<CheckCircleOutlined />} loading={conciliandoId === selectedRow.id} disabled={conciliandoId !== null && conciliandoId !== selectedRow.id} onClick={handleConciliar}>
                                                 Conciliar
                                             </Button>
                                             <Button onClick={() => setDetalleRow(selectedRow)}>Ver detalle</Button>
