@@ -287,18 +287,27 @@ export default function ConciliacionesPage() {
                 setSelectedMovementId(null);
                 setFlowStep(1);
                 setDocSeleccionado('factura');
+                refetch();
                 refetchHistorial();
             } else {
                 message.warning('No se encontró coincidencia.');
                 setFlowStep(2);
             }
         } catch (err) {
-            message.error(err.response?.data?.message || err.message || 'Error al conciliar.');
+            const statusCode = err.response?.status;
+            const errorMsg = err.response?.data?.message || err.message || 'Error al conciliar.';
+            if (statusCode === 409) {
+                message.warning('Este movimiento ya fue conciliado.');
+                refetch();
+                refetchHistorial();
+            } else {
+                message.error(errorMsg);
+            }
             setFlowStep(2);
         } finally {
             setConciliandoId(null);
         }
-    }, [selectedRow, docSeleccionado, sugerenciaFactura, sugerenciaSeed, facturas, cotizaciones]);
+    }, [selectedRow, docSeleccionado, sugerenciaFactura, sugerenciaSeed, facturas, cotizaciones, refetch, refetchHistorial]);
 
     const handleDesdeChange = useCallback((d) => {
         if (!d || !dateRange?.[1]) return;
