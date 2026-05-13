@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Button, Card, Checkbox, Empty, Input, List, Modal, Tag, Tooltip, message } from 'antd';
+import { Button, Card, Checkbox, Empty, Input, List, Modal, Tooltip, message } from 'antd';
 import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import Sidebar from '../../components/Sidebar';
 import AiSuggestedReplyModal from '../../components/mail/AiSuggestedReplyModal';
@@ -52,6 +52,7 @@ const MailThread = () => {
     const [isSavingCorrected, setIsSavingCorrected] = useState(false);
     const [isCorrectedDisabled, setIsCorrectedDisabled] = useState(false);
     const [openCotizacionModal, setOpenCotizacionModal] = useState(false);
+    const [cotizacionModalExpanded, setCotizacionModalExpanded] = useState(false);
     const [cotizacionPdfUrl, setCotizacionPdfUrl] = useState(null);
     const [aiSuggestionModalOpen, setAiSuggestionModalOpen] = useState(false);
     const [aiSuggestionModalText, setAiSuggestionModalText] = useState('');
@@ -70,14 +71,18 @@ const MailThread = () => {
     }, []);
 
     // Volver a la página correcta
+    // Volver a la lista conservando filtros en la URL (opción A)
     const goBack = () => {
         try {
             const q = new URLSearchParams(location.search || '');
-            const qp = Number(q.get('fromPage') || '0');
-            if (Number.isFinite(qp) && qp > 0) {
-                navigate(`/mails?page=${qp}`, { replace: true });
-                return;
+            const fp = Number(q.get('fromPage') || '0');
+            q.delete('fromPage');
+            if (Number.isFinite(fp) && fp > 0) {
+                q.set('page', String(fp));
             }
+            const s = q.toString();
+            navigate(s ? `/mails?${s}` : '/mails', { replace: true });
+            return;
         } catch {
             /* noop */
         }
@@ -150,6 +155,7 @@ const MailThread = () => {
 
     const closeCotizacionModal = () => {
         setOpenCotizacionModal(false);
+        setCotizacionModalExpanded(false);
         setCotizacionPdfUrl((prev) => {
             if (prev) URL.revokeObjectURL(prev);
             return null;
@@ -235,14 +241,7 @@ const MailThread = () => {
                     </Card>
 
                     <Card className="shadow border-[#370776]/10" title="Estado">
-                        <div className="flex flex-wrap gap-2">
-                            <Tag color={conversation.status?.state === 'closed' ? 'green' : 'blue'}>
-                                {conversation.status?.state || '—'}
-                            </Tag>
-                            <Tag color="purple">{conversation.status?.stage || '—'}</Tag>
-                            <Tag color="gold">{conversation.status?.priority || '—'}</Tag>
-                        </div>
-                        <div className="mt-4 text-gray-600 text-sm">
+                        <div className="text-gray-600 text-sm">
                             Último: <b>{formatDate(conversation.summary?.lastMessageAt)}</b>
                         </div>
                         <div className="mt-1 text-gray-600 text-sm">
@@ -443,19 +442,35 @@ const MailThread = () => {
                 </Card>
 
                 <Modal
-                    title="Cotización"
+                    title={
+                        <div className="flex flex-wrap items-center justify-between gap-2 pr-10">
+                            <span>Cotización</span>
+                            <Button
+                                type="default"
+                                size="small"
+                                onClick={() => setCotizacionModalExpanded((v) => !v)}
+                            >
+                                {cotizacionModalExpanded ? 'Reducir' : 'Ampliar'}
+                            </Button>
+                        </div>
+                    }
                     open={openCotizacionModal}
                     onCancel={closeCotizacionModal}
                     footer={null}
-                    width="min(96vw, 960px)"
-                    styles={{ body: { padding: 0, height: '75vh' } }}
+                    width={cotizacionModalExpanded ? 'min(99vw, 1920px)' : 'min(96vw, 1200px)'}
+                    styles={{
+                        body: {
+                            padding: 0,
+                            height: cotizacionModalExpanded ? '90vh' : '80vh',
+                        },
+                    }}
                     destroyOnClose
                 >
                     {cotizacionPdfUrl ? (
                         <iframe
                             title="Cotización PDF"
                             src={cotizacionPdfUrl}
-                            className="w-full h-full min-h-[70vh] border-0"
+                            className={`w-full h-full border-0 ${cotizacionModalExpanded ? 'min-h-[85vh]' : 'min-h-[72vh]'}`}
                         />
                     ) : null}
                 </Modal>

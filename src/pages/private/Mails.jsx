@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import PrivatePageShell from '../../components/PrivatePageShell';
 import {
     Table,
@@ -18,6 +18,7 @@ import {
 import useEmailConversations from '../../hooks/useEmailConversations';
 import { useMediaQuery } from 'react-responsive';
 import { useNavigate, useLocation } from 'react-router-dom';
+import dayjs from 'dayjs';
 import EmailConversations from '../../services/EmailConversations';
 
 // Diccionarios para valores "técnicos" → texto amigable
@@ -64,6 +65,57 @@ const toYMD = (value) => {
     const d = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(d.getTime())) return '';
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/** Serializa filtros de Mails en query string (opción A: estado en la URL). */
+const buildMailsSearchParams = ({
+    page = 1,
+    email = '',
+    fecha = null,
+    clasificacion = '',
+    accion = '',
+    estado = '',
+}) => {
+    const q = new URLSearchParams();
+    if (Number(page) > 1) q.set('page', String(page));
+    const e = String(email || '').trim();
+    if (e) q.set('email', e);
+    const y = toYMD(fecha);
+    if (y) q.set('fecha', y);
+    if (clasificacion) q.set('clasificacion', clasificacion);
+    if (accion) q.set('accion', accion);
+    if (estado) q.set('estado', estado);
+    return q;
+};
+
+const searchParamsEqual = (aStr, bStr) => {
+    const norm = (s) => {
+        const raw = typeof s === 'string' ? (s.startsWith('?') ? s.slice(1) : s) : '';
+        const q = new URLSearchParams(raw);
+        return [...q.entries()]
+            .sort(([x], [y]) => x.localeCompare(y))
+            .map(([k, v]) => `${k}=${v}`)
+            .join('&');
+    };
+    return norm(aStr || '') === norm(bStr || '');
+};
+
+const parseMailsSearch = (search) => {
+    const q = new URLSearchParams(search || '');
+    const p = Number(q.get('page') || '1');
+    const page = Number.isFinite(p) && p > 0 ? p : 1;
+    const email = q.get('email') || '';
+    const fechaStr = q.get('fecha') || '';
+    const fecha =
+        fechaStr && dayjs(fechaStr, 'YYYY-MM-DD', true).isValid() ? dayjs(fechaStr, 'YYYY-MM-DD') : null;
+    return {
+        page,
+        email,
+        fecha,
+        clasificacion: q.get('clasificacion') || '',
+        accion: q.get('accion') || '',
+        estado: q.get('estado') || '',
+    };
 };
 
 const formatDate = (date) => {
@@ -127,24 +179,67 @@ const MailFeedbackDots = ({ record }) => {
 };
 
 const Mails = () => {
-    const [emailQuery, setEmailQuery] = useState('');
-    const [dateFilter, setDateFilter] = useState(null);
-    const [clasificacionFilter, setClasificacionFilter] = useState('');
-    const [accionFilter, setAccionFilter] = useState('');
-    const [estadoFilter, setEstadoFilter] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-
-    const isMobile = useMediaQuery({ maxWidth: 768 });
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Sincronizar currentPage con ?page= de la URL
+    const initialSearch = parseMailsSearch(location.search || '');
+    const [emailQuery, setEmailQuery] = useState(() => initialSearch.email);
+    const [dateFilter, setDateFilter] = useState(() => initialSearch.fecha);
+    const [clasificacionFilter, setClasificacionFilter] = useState(() => initialSearch.clasificacion);
+    const [accionFilter, setAccionFilter] = useState(() => initialSearch.accion);
+    const [estadoFilter, setEstadoFilter] = useState(() => initialSearch.estado);
+    const [currentPage, setCurrentPage] = useState(() => initialSearch.page);
+
+    const isMobile = useMediaQuery({ maxWidth: 768 });
+
+    const filtersSnapshot = useRef({
+        page: 1,
+        email: '',
+        fecha: null,
+        clasificacion: '',
+        accion: '',
+        estado: '',
+    });
+    const locationSearchRef = useRef(location.search);
+    locationSearchRef.current = location.search;
+    filtersSnapshot.current = {
+        page: currentPage,
+        email: emailQuery,
+        fecha: dateFilter,
+        clasificacion: clasificacionFilter,
+        accion: accionFilter,
+        estado: estadoFilter,
+    };
+
+    // Sincronizar filtros y página desde la URL (opción A)
     useEffect(() => {
-        const q = new URLSearchParams(location.search || '');
-        const p = Number(q.get('page') || '1');
-        const page = Number.isFinite(p) && p > 0 ? p : 1;
-        setCurrentPage(page);
+        const parsed = parseMailsSearch(location.search || '');
+        setCurrentPage(parsed.page);
+        setEmailQuery(parsed.email);
+        setDateFilter(parsed.fecha);
+        setClasificacionFilter(parsed.clasificacion);
+        setAccionFilter(parsed.accion);
+        setEstadoFilter(parsed.estado);
     }, [location.search]);
+
+    // Correo del cliente: reflejar en la URL con debounce para no navegar en cada tecla
+    useEffect(() => {
+        const t = setTimeout(() => {
+            const s = filtersSnapshot.current;
+            const q = buildMailsSearchParams({
+                page: s.page,
+                email: s.email,
+                fecha: s.fecha,
+                clasificacion: s.clasificacion,
+                accion: s.accion,
+                estado: s.estado,
+            });
+            const next = q.toString();
+            if (searchParamsEqual(next, locationSearchRef.current || '')) return;
+            navigate(next ? `/mails?${next}` : '/mails', { replace: true });
+        }, 450);
+        return () => clearTimeout(t);
+    }, [emailQuery, navigate]);
 
     const isCesar = useMemo(() => {
         try {
@@ -318,7 +413,14 @@ const Mails = () => {
                         type="primary"
                         size="small"
                         onClick={() => {
-                            const q = new URLSearchParams(location.search || '');
+                            const q = buildMailsSearchParams({
+                                page: currentPage,
+                                email: emailQuery,
+                                fecha: dateFilter,
+                                clasificacion: clasificacionFilter,
+                                accion: accionFilter,
+                                estado: estadoFilter,
+                            });
                             q.set('fromPage', String(currentPage));
                             navigate(`/mails/${String(record._id)}?${q.toString()}`, { state: { conversation: record } });
                         }}
@@ -368,8 +470,15 @@ const Mails = () => {
                             allowClear
                             value={dateFilter}
                             onChange={(val) => {
-                                setCurrentPage(1);
-                                setDateFilter(val);
+                                const q = buildMailsSearchParams({
+                                    page: 1,
+                                    email: emailQuery,
+                                    fecha: val,
+                                    clasificacion: clasificacionFilter,
+                                    accion: accionFilter,
+                                    estado: estadoFilter,
+                                });
+                                navigate(q.toString() ? `/mails?${q}` : '/mails', { replace: true });
                             }}
                             className="w-full sm:w-[220px]"
                         />
@@ -382,8 +491,16 @@ const Mails = () => {
                             placeholder="Clasificación"
                             className="w-full sm:w-[260px]"
                             onChange={(val) => {
-                                setCurrentPage(1);
-                                setClasificacionFilter(val || '');
+                                const v = val || '';
+                                const q = buildMailsSearchParams({
+                                    page: 1,
+                                    email: emailQuery,
+                                    fecha: dateFilter,
+                                    clasificacion: v,
+                                    accion: accionFilter,
+                                    estado: estadoFilter,
+                                });
+                                navigate(q.toString() ? `/mails?${q}` : '/mails', { replace: true });
                             }}
                             options={Object.entries(CLASIFICACIONES).map(([value, label]) => ({ value, label }))}
                         />
@@ -394,8 +511,16 @@ const Mails = () => {
                             placeholder="Acción"
                             className="w-full sm:w-[220px]"
                             onChange={(val) => {
-                                setCurrentPage(1);
-                                setAccionFilter(val || '');
+                                const v = val || '';
+                                const q = buildMailsSearchParams({
+                                    page: 1,
+                                    email: emailQuery,
+                                    fecha: dateFilter,
+                                    clasificacion: clasificacionFilter,
+                                    accion: v,
+                                    estado: estadoFilter,
+                                });
+                                navigate(q.toString() ? `/mails?${q}` : '/mails', { replace: true });
                             }}
                             options={Object.entries(ACTIONS).map(([value, label]) => ({ value, label }))}
                         />
@@ -406,20 +531,23 @@ const Mails = () => {
                             placeholder="Estado"
                             className="w-full sm:w-[220px]"
                             onChange={(val) => {
-                                setCurrentPage(1);
-                                setEstadoFilter(val || '');
+                                const v = val || '';
+                                const q = buildMailsSearchParams({
+                                    page: 1,
+                                    email: emailQuery,
+                                    fecha: dateFilter,
+                                    clasificacion: clasificacionFilter,
+                                    accion: accionFilter,
+                                    estado: v,
+                                });
+                                navigate(q.toString() ? `/mails?${q}` : '/mails', { replace: true });
                             }}
                             options={Object.entries(THREAD_STATES).map(([value, label]) => ({ value, label }))}
                         />
 
                         <Button
                             onClick={() => {
-                                setCurrentPage(1);
-                                setEmailQuery('');
-                                setDateFilter(null);
-                                setClasificacionFilter('');
-                                setAccionFilter('');
-                                setEstadoFilter('');
+                                navigate('/mails', { replace: true });
                             }}
                         >
                             Limpiar
@@ -437,10 +565,15 @@ const Mails = () => {
                                 pageSize: itemsPerPage,
                                 current: currentPage,
                                 onChange: (page) => {
-                                    setCurrentPage(page);
-                                    const q = new URLSearchParams(location.search || '');
-                                    q.set('page', String(page));
-                                    navigate(`/mails?${q.toString()}`, { replace: true });
+                                    const q = buildMailsSearchParams({
+                                        page,
+                                        email: emailQuery,
+                                        fecha: dateFilter,
+                                        clasificacion: clasificacionFilter,
+                                        accion: accionFilter,
+                                        estado: estadoFilter,
+                                    });
+                                    navigate(q.toString() ? `/mails?${q}` : '/mails', { replace: true });
                                 },
                             }}
                             bordered
@@ -490,7 +623,14 @@ const Mails = () => {
                                                         type="primary"
                                                         size="small"
                                                         onClick={() => {
-                                                            const q = new URLSearchParams(location.search || '');
+                                                            const q = buildMailsSearchParams({
+                                                                page: currentPage,
+                                                                email: emailQuery,
+                                                                fecha: dateFilter,
+                                                                clasificacion: clasificacionFilter,
+                                                                accion: accionFilter,
+                                                                estado: estadoFilter,
+                                                            });
                                                             q.set('fromPage', String(currentPage));
                                                             navigate(`/mails/${String(conv._id)}?${q.toString()}`, { state: { conversation: conv } });
                                                         }}
@@ -520,7 +660,17 @@ const Mails = () => {
                                             current={currentPage}
                                             pageSize={itemsPerPage}
                                             total={dataToRender.length}
-                                            onChange={(page) => setCurrentPage(page)}
+                                            onChange={(page) => {
+                                                const q = buildMailsSearchParams({
+                                                    page,
+                                                    email: emailQuery,
+                                                    fecha: dateFilter,
+                                                    clasificacion: clasificacionFilter,
+                                                    accion: accionFilter,
+                                                    estado: estadoFilter,
+                                                });
+                                                navigate(q.toString() ? `/mails?${q}` : '/mails', { replace: true });
+                                            }}
                                         />
                                     </div>
                                 </>
