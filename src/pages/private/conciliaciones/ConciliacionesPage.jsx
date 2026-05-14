@@ -121,6 +121,8 @@ export default function ConciliacionesPage() {
     const [cotizacionManualPorMovimientoId, setCotizacionManualPorMovimientoId] = useState({});
     const [conciliandoId, setConciliandoId] = useState(null);
     const [docSeleccionado, setDocSeleccionado] = useState('factura');
+    const [detalleDoc, setDetalleDoc] = useState(null);
+    const [loadingDetalleDoc, setLoadingDetalleDoc] = useState(false);
 
     const isNarrow = useMediaQuery({ maxWidth: 1100 });
 
@@ -362,6 +364,27 @@ export default function ConciliacionesPage() {
             setLoadingDetalle(false);
         }
     }, []);
+
+    const handleVerDetalle = useCallback(async () => {
+        setDetalleRow(selectedRow);
+        setDetalleDoc(null);
+        const isFac = docSeleccionado === 'factura';
+        const doc = isFac ? sugerenciaFactura : sugerenciaSeed;
+        if (!doc?.id) return;
+        const fetchId = isFac ? (doc.cotizacion_ref ?? null) : doc.id;
+        if (!fetchId) return;
+        setLoadingDetalleDoc(true);
+        try {
+            const res = await conciliationApi.getCotizacionDetalle(fetchId);
+            if (res.data?.success) {
+                setDetalleDoc({ ...res.data.data, _docType: isFac ? 'factura' : 'cotizacion', _matchDoc: doc });
+            }
+        } catch {
+            // modal igual abre con info básica
+        } finally {
+            setLoadingDetalleDoc(false);
+        }
+    }, [selectedRow, docSeleccionado, sugerenciaFactura, sugerenciaSeed]);
 
     const subheader = import.meta.env.VITE_CONCILIACIONES_HEADER_SUB?.trim?.() || '';
     const formatDateTime = (v) => !v ? '—' : new Date(v).toLocaleString('es-CL');
@@ -644,7 +667,7 @@ export default function ConciliacionesPage() {
                                             <Button type="primary" className="h-10 flex-1 border-none bg-[#1D4ED8] text-white! font-bold" icon={<CheckCircleOutlined />} loading={conciliandoId === selectedRow.id} disabled={conciliandoId !== null && conciliandoId !== selectedRow.id} onClick={handleConciliar}>
                                                 Conciliar
                                             </Button>
-                                            <Button onClick={() => setDetalleRow(selectedRow)}>Ver detalle</Button>
+                                            <Button onClick={handleVerDetalle} loading={loadingDetalleDoc}>Ver detalle</Button>
                                         </div>
                                     </div>
                                 ) : <div className="flex flex-col items-center px-6 py-14 text-center text-[#A8A8A2]"><FileTextOutlined className="mb-3.5 text-[52px] opacity-25" /><p className="text-[12.5px]">Sin documentos encontrados.</p></div>}
@@ -654,21 +677,138 @@ export default function ConciliacionesPage() {
                 </>
             )}
 
-            <Modal title={detalle ? `Transferencia${detalle.id ? ` · ${detalle.id}` : ''}` : 'Detalle'} open={!!detalle} onCancel={() => { setDetalleRow(null); setDetalleConciliacionHistorial(null); }} footer={null} width={880} styles={{ body: { paddingTop: 12 } }}>
+            <Modal
+                title={detalle ? `Transferencia · ${detalle.id || '—'}` : 'Detalle'}
+                open={!!detalle}
+                onCancel={() => { setDetalleRow(null); setDetalleConciliacionHistorial(null); setDetalleDoc(null); }}
+                footer={null}
+                width={1040}
+                styles={{ body: { paddingTop: 12 } }}
+            >
                 {detalle && (
                     <Row gutter={[24, 24]}>
-                        <Col xs={24} md={12}>
-                            <h3 className="mb-3 border-b border-[#1A6B3C]/20 pb-2 text-sm font-bold text-[#1A6B3C]">Banco</h3>
+                        {/* ── IZQUIERDA: datos de la transferencia ── */}
+                        <Col xs={24} md={10}>
+                            <h3 className="mb-3 border-b border-[#1A6B3C]/20 pb-2 text-sm font-bold text-[#1A6B3C]">Transferencia bancaria</h3>
                             <Descriptions size="small" column={1} bordered>
-                                <Descriptions.Item label="ID">{dash(detalle.id)}</Descriptions.Item>
-                                <Descriptions.Item label="Monto">{typeof detalle.amount === 'number' ? `${formatCLP(detalle.amount)} ${detalle.currency || ''}`.trim() : '—'}</Descriptions.Item>
-                                <Descriptions.Item label="Fecha contable">{formatDateTime(detalle.post_date)}</Descriptions.Item>
-                                <Descriptions.Item label="Tipo">{detalle.type || '—'}</Descriptions.Item>
+                                <Descriptions.Item label="Monto">
+                                    {typeof detalle.amount === 'number' ? `${formatCLP(detalle.amount)} ${detalle.currency || ''}`.trim() : '—'}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Nombre">
+                                    {dash(detalle.counterpartyName)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="RUT">
+                                    {formatChileRutDisplay(detalle.counterpartyRut)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Fecha">
+                                    {formatDateTime(detalle.post_date)}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Tipo">
+                                    {detalle.type || '—'}
+                                </Descriptions.Item>
+                                <Descriptions.Item label="Banco">
+                                    {dash(detalle.counterpartyBank ?? detalle.bank_name)}
+                                </Descriptions.Item>
                             </Descriptions>
                         </Col>
-                        <Col xs={24} md={12} className="md:border-l md:border-[#1A6B3C]/15 md:pl-6">
-                            <h3 className="mb-3 border-b border-[#1A6B3C]/20 pb-2 text-sm font-bold text-[#1A6B3C]">Documento</h3>
-                            {cotizacionRow ? (
+
+                        {/* ── DERECHA: documento asociado con productos ── */}
+                        <Col xs={24} md={14} className="md:border-l md:border-[#1A6B3C]/15 md:pl-6">
+                            <h3 className="mb-3 border-b border-[#1A6B3C]/20 pb-2 text-sm font-bold text-[#1A6B3C]">Documento asociado</h3>
+
+                            {loadingDetalleDoc ? (
+                                <div className="flex items-center gap-2 py-8 text-sm text-[#6B6B65]">
+                                    <Spin size="small" /> Cargando detalle…
+                                </div>
+                            ) : detalleDoc ? (() => {
+                                const isFac = detalleDoc._docType === 'factura';
+                                const colorBorder = isFac ? '#86EFAC' : '#BFDBFE';
+                                const colorBg = isFac ? '#F0FDF4' : '#EFF6FF';
+                                const colorText = isFac ? '#16A34A' : '#1D4ED8';
+                                const docNum = detalleDoc.cotizacion ?? detalleDoc.factura;
+                                const razonSocial = detalleDoc.cliente?.razon_social ?? detalleDoc._matchDoc?.cliente ?? '—';
+                                const rut = formatChileRutDisplay(detalleDoc.rutcli ?? detalleDoc._matchDoc?.rut);
+                                const fecha = detalleDoc.fecha ? dayjs(detalleDoc.fecha).format('DD/MM/YYYY') : '—';
+                                const total = detalleDoc.totales?.totgen ?? detalleDoc._matchDoc?.monto;
+                                const items = Array.isArray(detalleDoc.detalle) ? detalleDoc.detalle : [];
+                                return (
+                                    <div className="space-y-3">
+                                        <div className="rounded-lg border p-3" style={{ borderColor: colorBorder, background: colorBg }}>
+                                            <div className="mb-1 inline-block rounded border bg-white px-2 py-0.5 font-mono text-xs font-bold" style={{ borderColor: colorBorder, color: colorText }}>
+                                                {isFac ? 'FAC' : 'COT'} {docNum}
+                                            </div>
+                                            <div className="text-sm font-semibold text-[#1A1A18]">{razonSocial}</div>
+                                            <div className="font-mono text-[11px] text-[#6B6B65]">{rut}</div>
+                                            <div className="text-[11px] text-[#A8A8A2]">Emitida: {fecha}</div>
+                                            <div className="mt-1 font-mono text-lg font-bold" style={{ color: colorText }}>
+                                                {typeof total === 'number' ? formatCLP(total) : '—'}
+                                            </div>
+                                        </div>
+
+                                        {items.length > 0 && (
+                                            <div>
+                                                <div className="mb-1.5 text-[10px] font-bold uppercase text-[#A8A8A2]">Productos / Servicios</div>
+                                                <div className="overflow-x-auto rounded border border-[#E4E4DF]">
+                                                    <table className="w-full border-collapse text-[11px]">
+                                                        <thead>
+                                                            <tr className="bg-[#FAFAF8] text-[10px] font-bold uppercase text-[#A8A8A2]">
+                                                                <th className="border-b border-[#E4E4DF] px-3 py-2 text-left">Descripción</th>
+                                                                <th className="border-b border-[#E4E4DF] px-3 py-2 text-right">Cant.</th>
+                                                                <th className="border-b border-[#E4E4DF] px-3 py-2 text-right">P. Unit.</th>
+                                                                <th className="border-b border-[#E4E4DF] px-3 py-2 text-right">Total</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {items.map((item, i) => {
+                                                                const desc = item.descripcion ?? item.nombre ?? item.producto ?? item.glosa ?? `Ítem ${i + 1}`;
+                                                                const qty = item.cantidad ?? item.qty ?? null;
+                                                                const unit = item.precio_unitario ?? item.precio ?? item.valor ?? null;
+                                                                const tot = item.total ?? item.precio_total ?? item.monto ?? null;
+                                                                return (
+                                                                    <tr key={i} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
+                                                                        <td className="px-3 py-2">{desc}</td>
+                                                                        <td className="px-3 py-2 text-right font-mono">{qty ?? '—'}</td>
+                                                                        <td className="px-3 py-2 text-right font-mono">{typeof unit === 'number' ? formatCLP(unit) : '—'}</td>
+                                                                        <td className="px-3 py-2 text-right font-mono font-semibold">{typeof tot === 'number' ? formatCLP(tot) : '—'}</td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                        {detalleDoc.totales && (
+                                                            <tfoot>
+                                                                {typeof detalleDoc.totales.neto === 'number' && (
+                                                                    <tr className="bg-[#FAFAF8] text-[#6B6B65]">
+                                                                        <td colSpan={3} className="border-t border-[#E4E4DF] px-3 py-1.5 text-right">Subtotal neto</td>
+                                                                        <td className="border-t border-[#E4E4DF] px-3 py-1.5 text-right font-mono">{formatCLP(detalleDoc.totales.neto)}</td>
+                                                                    </tr>
+                                                                )}
+                                                                {typeof detalleDoc.totales.iva === 'number' && (
+                                                                    <tr className="bg-[#FAFAF8] text-[#6B6B65]">
+                                                                        <td colSpan={3} className="px-3 py-1.5 text-right">IVA 19%</td>
+                                                                        <td className="px-3 py-1.5 text-right font-mono">{formatCLP(detalleDoc.totales.iva)}</td>
+                                                                    </tr>
+                                                                )}
+                                                                {typeof detalleDoc.totales.totgen === 'number' && (
+                                                                    <tr style={{ background: colorBg }}>
+                                                                        <td colSpan={3} className="border-t border-[#E4E4DF] px-3 py-2 text-right font-bold">TOTAL</td>
+                                                                        <td className="border-t border-[#E4E4DF] px-3 py-2 text-right font-mono font-bold" style={{ color: colorText }}>
+                                                                            {formatCLP(detalleDoc.totales.totgen)}
+                                                                        </td>
+                                                                    </tr>
+                                                                )}
+                                                            </tfoot>
+                                                        )}
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {items.length === 0 && (
+                                            <p className="text-sm text-[#A8A8A2]">Sin líneas de detalle disponibles.</p>
+                                        )}
+                                    </div>
+                                );
+                            })() : cotizacionRow ? (
                                 <Descriptions size="small" column={1} bordered>
                                     <Descriptions.Item label="ID">{dash(cotizacionRow.id)}</Descriptions.Item>
                                     <Descriptions.Item label="Cliente">{dash(cotizacionRow.cliente)}</Descriptions.Item>
@@ -694,7 +834,7 @@ export default function ConciliacionesPage() {
                                     )}
                                 </div>
                             ) : (
-                                <p className="text-sm text-[#A8A8A2]">Sin información</p>
+                                <p className="text-sm text-[#A8A8A2]">Sin información de documento.</p>
                             )}
                         </Col>
                     </Row>
