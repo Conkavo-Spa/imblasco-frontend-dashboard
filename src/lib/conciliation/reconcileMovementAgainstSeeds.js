@@ -1,20 +1,14 @@
-import conciliationApi from '../../services/conciliation.service';
 import { matchMovementToSeed } from './matchMovementToSeed';
 
 /**
- * Concilia un movimiento: busca la cotización con el mismo monto y guarda
- * el par en MongoDB. Retorna la cotización encontrada o null.
+ * Función pura: busca el documento que coincide con el movimiento (monto + RUT).
+ * NO guarda la conciliación — eso lo hace el caller (handleConciliar).
  *
  * @param {object} movement - DTO Fintoc con id y amount
- * @param {Array<object>} seeds - cotizaciones cargadas
- * @returns {Promise<object | null>}
+ * @param {Array<object>} seeds - cotizaciones o facturas cargadas
+ * @returns {object | null} - el documento coincidente o null
  */
 export async function reconcileMovementAgainstSeeds(movement, seeds) {
     if (!movement?.id || typeof movement.amount !== 'number') return null;
-
-    const matched = matchMovementToSeed(movement, seeds);
-    if (!matched) return null;
-
-    await conciliationApi.saveConciliacion({ movement, cotizacion: matched });
-    return matched;
+    return matchMovementToSeed(movement, seeds);
 }
