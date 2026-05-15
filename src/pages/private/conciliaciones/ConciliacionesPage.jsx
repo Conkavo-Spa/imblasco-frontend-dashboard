@@ -7,6 +7,7 @@ import {
     CheckCircleOutlined,
     RightOutlined,
     DownloadOutlined,
+    DeleteOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { useMediaQuery } from 'react-responsive';
@@ -91,16 +92,17 @@ export default function ConciliacionesPage() {
     );
 
     // Documentos con rango amplio fijo (último año)
-    const { cotizaciones } = useCotizaciones(
+    const { cotizaciones, loading: loadingCotizaciones } = useCotizaciones(
         dayjs().subtract(1, 'year').format('YYYY-MM-DD'),
         dayjs().format('YYYY-MM-DD')
     );
-    const { facturas } = useFacturas(
+    const { facturas, loading: loadingFacturas } = useFacturas(
         dayjs().subtract(1, 'year').format('YYYY-MM-DD'),
         dayjs().format('YYYY-MM-DD')
     );
+    const loadingDocumentos = loadingCotizaciones || loadingFacturas;
 
-    const { conciliaciones, loading: loadingHistorial, refetch: refetchHistorial } = useConciliaciones();
+    const { conciliaciones, allConciliaciones, loading: loadingHistorial, loadingMore: loadingMoreHistorial, total: totalHistorial, hasMore: hasMoreHistorial, refetch: refetchHistorial, loadMore: loadMoreHistorial } = useConciliaciones();
 
     // Estado y selección
     const [mainTab, setMainTab] = useState('pendientes');
@@ -123,31 +125,42 @@ export default function ConciliacionesPage() {
     const [docSeleccionado, setDocSeleccionado] = useState('factura');
     const [detalleDoc, setDetalleDoc] = useState(null);
     const [loadingDetalleDoc, setLoadingDetalleDoc] = useState(false);
+    const [loadingHistorialId, setLoadingHistorialId] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
+    const [historialSearch, setHistorialSearch] = useState('');
+    const [noConciliadasSearch, setNoConciliadasSearch] = useState('');
+    const [noConciliadasTipo, setNoConciliadasTipo] = useState('all');
 
     const isNarrow = useMediaQuery({ maxWidth: 1100 });
 
-    // IDs conciliados
-    const conciliadosIds = useMemo(() => new Set(conciliaciones.map(c => c.movement_id)), [conciliaciones]);
-    const cotizacionesNoId = useMemo(() => new Set(), []);
-    const facturasNoId = useMemo(() => new Set(), []);
-
-    conciliaciones.forEach(c => {
-        const dt = c.document_type ?? 'cotizacion';
-        if (dt !== 'factura' && c.cotizacion_id) cotizacionesNoId.add(String(c.cotizacion_id));
-        if (dt === 'factura' && c.factura_id) facturasNoId.add(String(c.factura_id));
-    });
+    // IDs conciliados — usa allConciliaciones (todos, no solo los visibles) para filtrar correctamente la cartola
+    const conciliadosIds = useMemo(() => new Set(allConciliaciones.map(c => c.movement_id)), [allConciliaciones]);
+    const cotizacionesNoId = useMemo(() => {
+        const s = new Set();
+        allConciliaciones.forEach(c => { if ((c.document_type ?? 'cotizacion') !== 'factura' && c.cotizacion_id) s.add(String(c.cotizacion_id)); });
+        return s;
+    }, [allConciliaciones]);
+    const facturasNoId = useMemo(() => {
+        const s = new Set();
+        allConciliaciones.forEach(c => { if (c.document_type === 'factura' && c.factura_id) s.add(String(c.factura_id)); });
+        return s;
+    }, [allConciliaciones]);
 
     // Filas enriquecidas
     const enrichedRows = useMemo(() => {
         if (!Array.isArray(movements)) return [];
+        const unconciliatedFacturas = Array.isArray(facturas) ? facturas.filter((f) => !facturasNoId.has(f.id)) : [];
+        const unconciliatedCots = Array.isArray(cotizaciones) ? cotizaciones.filter(c => !cotizacionesNoId.has(c.id)) : [];
         return movements.filter(m => !conciliadosIds.has(m.id)).map(m => {
-            const porSeed = matchMovementToSeed(m, Array.isArray(cotizaciones) ? cotizaciones.filter(c => !cotizacionesNoId.has(c.id)) : []);
+            const porSeed = matchMovementToSeed(m, unconciliatedCots);
+            const facturaSeed = matchMovementToSeed(m, unconciliatedFacturas);
             const manual = cotizacionManualPorMovimientoId[m.id] ?? null;
-            let cotizacion = manual || (porSeed && SEED_IDS_PRECONCILIADAS_DEMO.has(porSeed.id) ? porSeed : null);
+            let cotizacion = manual || porSeed || null;
             const counterparty = mergeMovementCounterparty(m.sender_account, m.recipient_account);
             return {
                 ...m,
                 cotizacion,
+                facturaSeed,
                 counterparty,
                 counterpartyName: counterparty?.holder_name ?? null,
                 counterpartyRut: counterparty?.holder_id ?? null,
@@ -155,7 +168,7 @@ export default function ConciliacionesPage() {
                 counterpartyAccount: counterparty?.number ?? null,
             };
         });
-    }, [movements, cotizacionManualPorMovimientoId, conciliadosIds, cotizacionesNoId, cotizaciones]);
+    }, [movements, cotizacionManualPorMovimientoId, conciliadosIds, cotizacionesNoId, cotizaciones, facturas, facturasNoId]);
 
     const cuentaTabs = useMemo(() => {
         const names = [...new Set(enrichedRows.map((r) => r.bank_name).filter(Boolean))].sort();
@@ -189,10 +202,7 @@ export default function ConciliacionesPage() {
         });
     }, [scopedRows, estadoFiltro, searchText, minMonto, maxMonto, bancoFiltro]);
 
-    const pendientesLista = useMemo(
-        () => filteredRows.filter((r) => !r.cotizacion),
-        [filteredRows]
-    );
+    const pendientesLista = useMemo(() => filteredRows, [filteredRows]);
 
     const conciliadasLista = useMemo(
         () => [...filteredRows.filter((r) => r.cotizacion)].sort((a, b) => String(b.post_date || '').localeCompare(String(a.post_date || ''))),
@@ -205,6 +215,13 @@ export default function ConciliacionesPage() {
             setFlowStep(1);
         }
     }, [pendientesLista, selectedMovementId]);
+
+    useEffect(() => {
+        if (mainTab !== 'pendientes') {
+            setSelectedMovementId(null);
+            setFlowStep(1);
+        }
+    }, [mainTab]);
 
     const selectedRow = useMemo(
         () => pendientesLista.find((r) => r.id === selectedMovementId) ?? null,
@@ -243,6 +260,34 @@ export default function ConciliacionesPage() {
         return result.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
     }, [facturas, cotizaciones, facturasNoId, cotizacionesNoId]);
 
+    const historialFiltered = useMemo(() => {
+        if (!historialSearch.trim()) return conciliaciones;
+        const q = historialSearch.trim().toLowerCase();
+        // Al buscar, recorre TODOS los registros (no solo los visibles)
+        return allConciliaciones.filter(c =>
+            (c.cliente ?? '').toLowerCase().includes(q) ||
+            String(c.rut ?? '').includes(q) ||
+            String(c.factura_id ?? '').includes(q) ||
+            String(c.cotizacion_id ?? '').includes(q)
+        );
+    }, [conciliaciones, allConciliaciones, historialSearch]);
+
+    const noConciliadasFiltered = useMemo(() => {
+        let result = noConciliadas;
+        if (noConciliadasTipo !== 'all') {
+            result = result.filter(doc => doc._type === noConciliadasTipo);
+        }
+        if (noConciliadasSearch.trim()) {
+            const q = noConciliadasSearch.trim().toLowerCase();
+            result = result.filter(doc =>
+                (doc.cliente ?? '').toLowerCase().includes(q) ||
+                String(doc.rut ?? '').includes(q) ||
+                String(doc.id ?? '').includes(q)
+            );
+        }
+        return result;
+    }, [noConciliadas, noConciliadasSearch, noConciliadasTipo]);
+
     // Sugerencias para detalle modal
     const detalleFactura = useMemo(() => {
         if (!detalleRow) return null;
@@ -262,53 +307,63 @@ export default function ConciliacionesPage() {
         setFlowStep(2);
     }, []);
 
-    const handleConciliar = useCallback(async () => {
+    const handleConciliar = useCallback(() => {
         const record = selectedRow;
         if (!record?.id) return;
 
-        let selectedDoc = docSeleccionado === 'factura' ? sugerenciaFactura : sugerenciaSeed;
+        const selectedDoc = docSeleccionado === 'factura' ? sugerenciaFactura : sugerenciaSeed;
         if (!selectedDoc) {
             message.warning(`No hay ${docSeleccionado} seleccionada.`);
             return;
         }
 
-        setFlowStep(3);
-        setConciliandoId(record.id);
-        try {
-            const seeds = docSeleccionado === 'factura' ? facturas : cotizaciones;
-            const found = await reconcileMovementAgainstSeeds(record, seeds);
-            if (found) {
-                const payload = { movement: record, document_type: docSeleccionado };
-                if (docSeleccionado === 'factura') payload.factura = selectedDoc;
-                else payload.cotizacion = selectedDoc;
-                await conciliationApi.saveConciliacion(payload);
-                setCotizacionManualPorMovimientoId(p => ({ ...p, [record.id]: found }));
-                setFlashMatch(true);
-                setTimeout(() => setFlashMatch(false), 700);
-                message.success('Conciliación registrada');
-                setSelectedMovementId(null);
-                setFlowStep(1);
-                setDocSeleccionado('factura');
-                refetch();
-                refetchHistorial();
-            } else {
-                message.warning('No se encontró coincidencia.');
-                setFlowStep(2);
-            }
-        } catch (err) {
-            const statusCode = err.response?.status;
-            const errorMsg = err.response?.data?.message || err.message || 'Error al conciliar.';
-            if (statusCode === 409) {
-                message.warning('Este movimiento ya fue conciliado.');
-                refetch();
-                refetchHistorial();
-            } else {
-                message.error(errorMsg);
-            }
-            setFlowStep(2);
-        } finally {
-            setConciliandoId(null);
-        }
+        const isFac = docSeleccionado === 'factura';
+        Modal.confirm({
+            title: '¿Confirmar conciliación?',
+            content: `${isFac ? 'FAC' : 'COT'} ${selectedDoc.id} · ${selectedDoc.cliente || '—'} · ${typeof selectedDoc.monto === 'number' ? formatCLP(selectedDoc.monto) : '—'}`,
+            okText: 'Sí, conciliar',
+            cancelText: 'Cancelar',
+            okButtonProps: { style: { background: '#1D4ED8', borderColor: '#1D4ED8' } },
+            onOk: async () => {
+                setFlowStep(3);
+                setConciliandoId(record.id);
+                try {
+                    const seeds = isFac ? facturas : cotizaciones;
+                    const found = await reconcileMovementAgainstSeeds(record, seeds);
+                    if (found) {
+                        const payload = { movement: record, document_type: docSeleccionado };
+                        if (isFac) payload.factura = selectedDoc;
+                        else payload.cotizacion = selectedDoc;
+                        await conciliationApi.saveConciliacion(payload);
+                        setCotizacionManualPorMovimientoId(p => ({ ...p, [record.id]: found }));
+                        setFlashMatch(true);
+                        setTimeout(() => setFlashMatch(false), 700);
+                        message.success('Conciliación registrada');
+                        setSelectedMovementId(null);
+                        setFlowStep(1);
+                        setDocSeleccionado('factura');
+                        refetch();
+                        refetchHistorial();
+                    } else {
+                        message.warning('No se encontró coincidencia.');
+                        setFlowStep(2);
+                    }
+                } catch (err) {
+                    const statusCode = err.response?.status;
+                    const errorMsg = err.response?.data?.message || err.message || 'Error al conciliar.';
+                    if (statusCode === 409) {
+                        message.warning('Este movimiento ya fue conciliado.');
+                        refetch();
+                        refetchHistorial();
+                    } else {
+                        message.error(errorMsg);
+                    }
+                    setFlowStep(2);
+                } finally {
+                    setConciliandoId(null);
+                }
+            },
+        });
     }, [selectedRow, docSeleccionado, sugerenciaFactura, sugerenciaSeed, facturas, cotizaciones, refetch, refetchHistorial]);
 
     const handleDesdeChange = useCallback((d) => {
@@ -331,31 +386,135 @@ export default function ConciliacionesPage() {
         setRange(dateRange[0].format('YYYY-MM-DD'), d.format('YYYY-MM-DD'));
     }, [dateRange, setRange]);
 
-    const handleDetalleHistorial = useCallback((conciliacion) => {
-        setDetalleConciliacionHistorial(conciliacion);
-        const foundMovement = movements?.find(m => m.id === conciliacion.movement_id);
-        if (foundMovement) {
-            setDetalleRow(foundMovement);
-        } else {
-            setDetalleRow({
-                id: conciliacion.movement_id ?? conciliacion._id ?? '—',
-                amount: conciliacion.monto ?? null,
-                currency: 'CLP',
-                post_date: conciliacion.fecha_movimiento ?? null,
-                type: conciliacion.type ?? 'transfer',
-            });
+    const handleDetalleHistorial = useCallback(async (conciliacion) => {
+        const isFac = (conciliacion.document_type ?? 'cotizacion') === 'factura';
+        const docId = isFac ? conciliacion.factura_id : conciliacion.cotizacion_id;
+        if (!docId) return;
+
+        setLoadingHistorialId(conciliacion._id);
+        setLoadingDetalleDoc(true);
+        let docData = null;
+        try {
+            if (isFac) {
+                // 1. Intentar via cotizacion_ref guardado en el seed de la factura
+                const cotRefStored = conciliacion.factura?.cotizacion_ref;
+                if (cotRefStored) {
+                    try {
+                        const cotRes = await conciliationApi.getCotizacionDetalle(String(cotRefStored));
+                        if (cotRes?.success) docData = { ...cotRes.data, _docType: 'cotizacion' };
+                    } catch (_e) { /* fall through */ }
+                }
+                // 2. Fetch FAC desde MongoDB y seguir su referencia cotizacion
+                if (!docData) {
+                    try {
+                        const res = await conciliationApi.getFacturaDetalle(docId);
+                        if (res?.success) {
+                            const fac = res.data;
+                            if (Array.isArray(fac.detalle) && fac.detalle.length > 0) {
+                                docData = { ...fac, _docType: 'factura' };
+                            } else {
+                                const cotRef = fac.cotizacion ?? fac.cotizacion_ref;
+                                if (cotRef) {
+                                    try {
+                                        const cotRes = await conciliationApi.getCotizacionDetalle(String(cotRef));
+                                        if (cotRes?.success) docData = { ...cotRes.data, _docType: 'cotizacion' };
+                                    } catch (_e) { /* fall through */ }
+                                }
+                                if (!docData) docData = { ...fac, _docType: 'factura' };
+                            }
+                        }
+                    } catch (e) { console.error('getFacturaDetalle error:', e); }
+                }
+                // 3. Fallback: usar el seed guardado en la conciliación (sin detalle de productos)
+                if (!docData && conciliacion.factura) {
+                    docData = {
+                        _docType: 'factura',
+                        factura: conciliacion.factura_id,
+                        cliente: { razon_social: conciliacion.cliente ?? null },
+                        rutcli: conciliacion.rut ? String(conciliacion.rut).replace(/\D/g, '') : null,
+                        fecha: conciliacion.fecha_movimiento ?? null,
+                        totgen: conciliacion.monto ?? null,
+                        detalle: [],
+                        _fromStoredSeed: true,
+                    };
+                }
+            } else {
+                // 1. Buscar COT en MongoDB
+                try {
+                    const res = await conciliationApi.getCotizacionDetalle(docId);
+                    if (res?.success) docData = { ...res.data, _docType: 'cotizacion' };
+                } catch (e) { console.error('getCotizacionDetalle error:', e); }
+                // 2. Fallback: usar el seed guardado en la conciliación
+                if (!docData && conciliacion.cotizacion) {
+                    const seed = conciliacion.cotizacion;
+                    docData = {
+                        _docType: 'cotizacion',
+                        cotizacion: conciliacion.cotizacion_id,
+                        cliente: { razon_social: seed.cliente ?? conciliacion.cliente ?? null },
+                        rutcli: seed.rut ? String(seed.rut).replace(/\D/g, '') : null,
+                        fecha: seed.fecha ?? conciliacion.fecha_movimiento ?? null,
+                        totales: { totgen: seed.monto ?? conciliacion.monto ?? null },
+                        detalle: [],
+                        _fromStoredSeed: true,
+                    };
+                }
+            }
+        } catch (err) {
+            console.error('handleDetalleHistorial error:', err);
+        } finally {
+            setLoadingDetalleDoc(false);
+            setLoadingHistorialId(null);
         }
+
+        const movRow = movements?.find(m => m.id === conciliacion.movement_id) ?? {
+            id: conciliacion.movement_id ?? '—',
+            amount: conciliacion.monto ?? null,
+            currency: 'CLP',
+            post_date: conciliacion.fecha_movimiento ?? null,
+            type: conciliacion.type ?? 'transfer',
+        };
+        setDetalleDoc(docData);
+        setDetalleConciliacionHistorial(conciliacion);
+        setDetalleRow(movRow);
     }, [movements]);
+
+    const handleDeleteConciliacion = useCallback((c) => {
+        const dt = c.document_type ?? 'cotizacion';
+        const isF = dt === 'factura';
+        Modal.confirm({
+            title: '¿Eliminar esta conciliación?',
+            content: `${isF ? 'FAC' : 'COT'} ${isF ? c.factura_id : c.cotizacion_id} · ${c.cliente ?? '—'} · ${typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}`,
+            okText: 'Sí, eliminar',
+            cancelText: 'Cancelar',
+            okButtonProps: { danger: true },
+            onOk: async () => {
+                setDeletingId(c._id);
+                try {
+                    await conciliationApi.deleteConciliacion(c._id);
+                    message.success('Conciliación eliminada');
+                    refetchHistorial();
+                    refetch();
+                } catch (err) {
+                    message.error(err.response?.data?.message || 'Error al eliminar la conciliación');
+                } finally {
+                    setDeletingId(null);
+                }
+            },
+        });
+    }, [refetchHistorial, refetch]);
 
     const handleOpenModalDetalle = useCallback(async (conciliacion) => {
         setModalConciliacion(conciliacion);
         setDetalleProductos(null);
         setLoadingDetalle(true);
         try {
-            const docId = (conciliacion.document_type ?? 'cotizacion') === 'factura' ? conciliacion.factura_id : conciliacion.cotizacion_id;
+            const isFac = (conciliacion.document_type ?? 'cotizacion') === 'factura';
+            const docId = isFac ? conciliacion.factura_id : conciliacion.cotizacion_id;
             if (docId) {
-                const res = await conciliationApi.getCotizacionDetalle(docId);
-                setDetalleProductos(res.data?.success ? res.data.data : { error: 'No se pudieron cargar' });
+                const res = isFac
+                    ? await conciliationApi.getFacturaDetalle(docId)
+                    : await conciliationApi.getCotizacionDetalle(docId);
+                setDetalleProductos(res?.success ? res.data : { error: 'No se pudieron cargar' });
             }
         } catch (err) {
             console.error('Error:', err);
@@ -366,24 +525,65 @@ export default function ConciliacionesPage() {
     }, []);
 
     const handleVerDetalle = useCallback(async () => {
-        setDetalleRow(selectedRow);
-        setDetalleDoc(null);
         const isFac = docSeleccionado === 'factura';
-        const doc = isFac ? sugerenciaFactura : sugerenciaSeed;
-        if (!doc?.id) return;
-        const fetchId = isFac ? (doc.cotizacion_ref ?? null) : doc.id;
-        if (!fetchId) return;
+        const primaryDoc = isFac ? sugerenciaFactura : sugerenciaSeed;
+        const seedDoc = sugerenciaSeed;
+        if (!primaryDoc?.id && !seedDoc?.id) return;
+
         setLoadingDetalleDoc(true);
+        let docData = null;
         try {
-            const res = await conciliationApi.getCotizacionDetalle(fetchId);
-            if (res.data?.success) {
-                setDetalleDoc({ ...res.data.data, _docType: isFac ? 'factura' : 'cotizacion', _matchDoc: doc });
+            if (isFac) {
+                // 1. Usar cotizacion_ref del seed (ya viene populado desde el hook)
+                const cotRefFromSeed = primaryDoc?.cotizacion_ref ?? seedDoc?.id;
+                if (cotRefFromSeed) {
+                    try {
+                        const cotRes = await conciliationApi.getCotizacionDetalle(String(cotRefFromSeed));
+                        if (cotRes?.success) {
+                            docData = { ...cotRes.data, _docType: 'cotizacion', _matchDoc: primaryDoc ?? seedDoc };
+                        }
+                    } catch (_e) { /* fall through */ }
+                }
+                // 2. Fetch FAC desde MongoDB y seguir su campo cotizacion
+                if (!docData && primaryDoc?.id) {
+                    try {
+                        const facRes = await conciliationApi.getFacturaDetalle(primaryDoc.id);
+                        if (facRes?.success) {
+                            const fac = facRes.data;
+                            if (Array.isArray(fac.detalle) && fac.detalle.length > 0) {
+                                docData = { ...fac, _docType: 'factura', _matchDoc: primaryDoc };
+                            } else {
+                                const cotRef = fac.cotizacion ?? fac.cotizacion_ref;
+                                if (cotRef) {
+                                    try {
+                                        const cotRes = await conciliationApi.getCotizacionDetalle(String(cotRef));
+                                        if (cotRes?.success) {
+                                            docData = { ...cotRes.data, _docType: 'cotizacion', _matchDoc: primaryDoc };
+                                        }
+                                    } catch (_e) { /* fall through */ }
+                                }
+                                if (!docData) docData = { ...fac, _docType: 'factura', _matchDoc: primaryDoc };
+                            }
+                        }
+                    } catch (e) { console.error('[detalle] getFacturaDetalle error:', e); }
+                }
+            } else {
+                // COT seleccionada: fetch directo
+                try {
+                    const cotRes = await conciliationApi.getCotizacionDetalle(String(primaryDoc.id));
+                    if (cotRes?.success) {
+                        docData = { ...cotRes.data, _docType: 'cotizacion', _matchDoc: primaryDoc };
+                    }
+                } catch (e) { console.error('[detalle] getCotizacionDetalle error:', e); }
             }
-        } catch {
-            // modal igual abre con info básica
+        } catch (err) {
+            console.error('[detalle] handleVerDetalle error:', err);
         } finally {
             setLoadingDetalleDoc(false);
         }
+        setDetalleDoc(docData);
+        setDetalleConciliacionHistorial(null);
+        setDetalleRow(selectedRow);
     }, [selectedRow, docSeleccionado, sugerenciaFactura, sugerenciaSeed]);
 
     const subheader = import.meta.env.VITE_CONCILIACIONES_HEADER_SUB?.trim?.() || '';
@@ -396,21 +596,6 @@ export default function ConciliacionesPage() {
     const rightTitle = !selectedRow ? '— Selecciona una transferencia' : sugerenciaFactura || sugerenciaSeed ? `${(sugerenciaFactura ? 1 : 0) + (sugerenciaSeed ? 1 : 0)} coincidencia${sugerenciaFactura && sugerenciaSeed ? 's' : ''}` : '— Sin coincidencia';
 
     const detalle = detalleRow;
-    let cotizacionRow = detalle?.cotizacion ?? null;
-
-    if (!cotizacionRow && detalleConciliacionHistorial) {
-        const dt = detalleConciliacionHistorial.document_type ?? 'cotizacion';
-        const docId = dt === 'factura' ? detalleConciliacionHistorial.factura_id : detalleConciliacionHistorial.cotizacion_id;
-        if (docId) {
-            cotizacionRow = {
-                id: docId,
-                cliente: detalleConciliacionHistorial.cliente ?? '—',
-                monto: detalleConciliacionHistorial.monto ?? null,
-            };
-        }
-    }
-
-    const sourceAccount = detalle ? mergeMovementCounterparty(detalle.sender_account, detalle.recipient_account) : null;
 
     return (
         <PrivatePageShell>
@@ -448,34 +633,47 @@ export default function ConciliacionesPage() {
 
             {mainTab === 'historial' && (
                 <div className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
-                    <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
-                        <div className="flex items-center gap-4">
-                            <span className="text-[11.5px] font-bold uppercase text-[#1A1A18]">Transferencias conciliadas</span>
-                            <span className="font-mono text-[11px] text-[#A8A8A2]">{conciliaciones.length} registros</span>
+                    <div className="flex flex-wrap items-center gap-3 border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
+                        <div className="flex flex-1 items-center gap-3 min-w-0">
+                            <span className="shrink-0 text-[11.5px] font-bold uppercase text-[#1A1A18]">Transferencias conciliadas</span>
+                            <span className="shrink-0 font-mono text-[11px] text-[#A8A8A2]">
+                                {historialSearch.trim()
+                                    ? `${historialFiltered.length} / ${totalHistorial}`
+                                    : totalHistorial > conciliaciones.length
+                                        ? `${conciliaciones.length} de ${totalHistorial}`
+                                        : `${conciliaciones.length} registros`}
+                            </span>
                         </div>
-                        <button type="button" onClick={() => exportConciliacionesCSV(conciliaciones)} className="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[11px] font-semibold text-slate-800 transition-colors bg-[#1D4ED8] hover:bg-[#1E40AF]">
+                        <input
+                            type="text"
+                            placeholder="Buscar cliente, RUT o N° doc…"
+                            value={historialSearch}
+                            onChange={e => setHistorialSearch(e.target.value)}
+                            className="w-52 rounded border border-[#E4E4DF] bg-white px-3 py-1 text-[12px] focus:border-[#1A6B3C] focus:outline-none"
+                        />
+                        <button type="button" onClick={() => exportConciliacionesCSV(conciliaciones)} className="inline-flex items-center gap-1.5 rounded border border-[#3D3D37] px-3 py-1.5 text-[11px] font-semibold text-[#1A1A18] transition-colors hover:bg-[#EFEFEA]">
                             <DownloadOutlined />
                             Descargar CSV
                         </button>
                     </div>
-                    {loadingHistorial ? <div className="p-8 text-center text-sm text-[#6B6B65]">Cargando…</div> : conciliaciones.length === 0 ? <div className="p-10 text-center text-sm text-[#6B6B65]">Sin conciliaciones.</div> : (
+                    {loadingHistorial ? <div className="p-8 text-center text-sm text-[#6B6B65]">Cargando…</div> : conciliaciones.length === 0 ? <div className="p-10 text-center text-sm text-[#6B6B65]">Sin conciliaciones.</div> : historialFiltered.length === 0 ? <div className="p-10 text-center text-sm text-[#6B6B65]">Sin resultados para "{historialSearch}".</div> : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-[12px]">
                                 <thead className="border-b border-[#E4E4DF] bg-[#FAFAF8] text-[10px] font-bold uppercase text-[#A8A8A2]">
                                     <tr>
-                                        <th className="px-4 py-2">Fecha</th>
+                                        <th className="px-4 py-2">Fecha transf.</th>
                                         <th className="px-4 py-2">Banco</th>
                                         <th className="px-4 py-2">Tipo</th>
                                         <th className="px-4 py-2">N° Doc</th>
                                         <th className="px-4 py-2">Cliente</th>
                                         <th className="px-4 py-2">RUT</th>
                                         <th className="px-4 py-2 text-right">Monto</th>
-                                        <th className="px-4 py-2">Fecha</th>
+                                        <th className="px-4 py-2">Conciliada el</th>
                                         <th className="px-4 py-2 text-center">Acción</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {conciliaciones.map((c) => {
+                                    {historialFiltered.map((c) => {
                                         const dt = c.document_type ?? 'cotizacion';
                                         const isF = dt === 'factura';
                                         return (
@@ -489,16 +687,34 @@ export default function ConciliacionesPage() {
                                                 <td className="px-4 py-2.5 text-right font-mono font-semibold">{typeof c.monto === 'number' ? formatCLP(c.monto) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-[#A8A8A2]">{c.createdAt ? new Date(c.createdAt).toLocaleString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-center">
-                                                    <button type="button" onClick={() => handleDetalleHistorial(c)} className="inline-flex items-center justify-center rounded px-2.5 py-1 text-[11px] font-semibold text-slate-800 transition-colors bg-[#1D4ED8] hover:bg-[#1E40AF]">
-                                                        <RightOutlined className="mr-1" />
-                                                        Detalle
-                                                    </button>
+                                                    <div className="inline-flex items-center gap-1.5">
+                                                        <button type="button" onClick={() => handleDetalleHistorial(c)} disabled={loadingHistorialId !== null || deletingId !== null} className="inline-flex items-center justify-center gap-1 rounded border border-[#370776] px-2.5 py-1 text-[11px] font-semibold text-[#370776] transition-colors hover:bg-[#F3EEFF] disabled:opacity-60 disabled:cursor-not-allowed">
+                                                            {loadingHistorialId === c._id ? <Spin size="small" /> : <RightOutlined />}
+                                                            Detalle
+                                                        </button>
+                                                        <button type="button" onClick={() => handleDeleteConciliacion(c)} disabled={deletingId !== null || loadingHistorialId !== null} className="inline-flex items-center justify-center gap-1 rounded px-2.5 py-1 text-[11px] font-semibold text-white transition-colors bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-60 disabled:cursor-not-allowed">
+                                                            {deletingId === c._id ? <Spin size="small" /> : <DeleteOutlined />}
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                 </tbody>
                             </table>
+                            {hasMoreHistorial && !historialSearch.trim() && (
+                                <div className="border-t border-[#E4E4DF] px-4 py-3 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={loadMoreHistorial}
+                                        disabled={loadingMoreHistorial}
+                                        className="inline-flex items-center gap-2 rounded border border-[#E4E4DF] px-4 py-1.5 text-[11px] font-semibold text-[#6B6B65] transition-colors hover:bg-[#F5F5F2] disabled:opacity-50"
+                                    >
+                                        {loadingMoreHistorial ? <Spin size="small" /> : null}
+                                        {loadingMoreHistorial ? 'Cargando…' : `Cargar más (${totalHistorial - conciliaciones.length} restantes)`}
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -506,11 +722,30 @@ export default function ConciliacionesPage() {
 
             {mainTab === 'no_conciliadas' && (
                 <div className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
-                    <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
-                        <span className="text-[11.5px] font-bold uppercase text-[#1A1A18]">Sin conciliar</span>
-                        <span className="font-mono text-[11px] text-[#A8A8A2]">{noConciliadas.length}</span>
+                    <div className="flex flex-wrap items-center gap-3 border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
+                        <div className="flex flex-1 items-center gap-3 min-w-0">
+                            <span className="shrink-0 text-[11.5px] font-bold uppercase text-[#1A1A18]">Sin conciliar</span>
+                            <span className="shrink-0 font-mono text-[11px] text-[#A8A8A2]">
+                                {(noConciliadasSearch.trim() || noConciliadasTipo !== 'all') ? `${noConciliadasFiltered.length} / ${noConciliadas.length}` : noConciliadas.length}
+                            </span>
+                        </div>
+                        <div className="flex rounded border border-[#E4E4DF] overflow-hidden text-[11px] font-semibold">
+                            {[['all', 'Todos'], ['factura', 'FAC'], ['cotizacion', 'COT']].map(([val, label]) => (
+                                <button key={val} type="button" onClick={() => setNoConciliadasTipo(val)}
+                                    className={`px-3 py-1 transition-colors ${noConciliadasTipo === val ? 'bg-[#1A6B3C] text-white' : 'bg-white text-[#6B6B65] hover:bg-[#F5F5F2]'}`}>
+                                    {label}
+                                </button>
+                            ))}
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Buscar cliente, RUT o N° doc…"
+                            value={noConciliadasSearch}
+                            onChange={e => setNoConciliadasSearch(e.target.value)}
+                            className="w-52 rounded border border-[#E4E4DF] bg-white px-3 py-1 text-[12px] focus:border-[#1A6B3C] focus:outline-none"
+                        />
                     </div>
-                    {noConciliadas.length === 0 ? <div className="p-10 text-center text-sm text-[#6B6B65]">Todas conciliadas ✓</div> : (
+                    {noConciliadas.length === 0 ? <div className="p-10 text-center text-sm text-[#6B6B65]">Todas conciliadas ✓</div> : noConciliadasFiltered.length === 0 ? <div className="p-10 text-center text-sm text-[#6B6B65]">Sin resultados para "{noConciliadasSearch}".</div> : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-[12px]">
                                 <thead className="border-b border-[#E4E4DF] bg-[#FAFAF8] text-[10px] font-bold uppercase text-[#A8A8A2]">
@@ -526,9 +761,11 @@ export default function ConciliacionesPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {noConciliadas.map((doc, idx) => {
+                                    {noConciliadasFiltered.map((doc, idx) => {
                                         const dias = dayjs().diff(dayjs(doc.fecha), 'day');
                                         const isF = doc._type === 'factura';
+                                        const diasColor = dias > 60 ? '#DC2626' : dias > 30 ? '#EA580C' : '#D97706';
+                                        const diasLabel = dias > 60 ? 'Crítica' : dias > 30 ? 'Vencida' : 'Sin pago';
                                         return (
                                             <tr key={`${doc._type}-${doc.id}-${idx}`} className="border-b border-[#E4E4DF] hover:bg-[#FAFAF8]">
                                                 <td className="px-4 py-2.5"><span className="inline-flex rounded px-2 py-1 text-[10px] font-semibold text-white" style={{ backgroundColor: isF ? '#16A34A' : '#1D4ED8' }}>{isF ? 'FAC' : 'COT'}</span></td>
@@ -538,7 +775,7 @@ export default function ConciliacionesPage() {
                                                 <td className="px-4 py-2.5 font-mono text-[#6B6B65]">{formatChileRutDisplay(doc.rut)}</td>
                                                 <td className="px-4 py-2.5 text-right font-mono font-semibold">{typeof doc.monto === 'number' ? formatCLP(doc.monto) : '—'}</td>
                                                 <td className="px-4 py-2.5 text-right font-mono text-[#6B6B65]">{dias}</td>
-                                                <td className="px-4 py-2.5"><span className="inline-flex rounded-full px-2 py-1 text-[10px] font-semibold text-white" style={{ backgroundColor: dias > 30 ? '#EA580C' : '#DC2626' }}>{dias > 30 ? 'Vencida' : 'Sin pago'}</span></td>
+                                                <td className="px-4 py-2.5"><span className="inline-flex rounded-full px-2 py-1 text-[10px] font-semibold text-white" style={{ backgroundColor: diasColor }}>{diasLabel}</span></td>
                                             </tr>
                                         );
                                     })}
@@ -606,6 +843,11 @@ export default function ConciliacionesPage() {
                                         <div className="shrink-0 text-right">
                                             <div className="font-mono text-[13px] font-semibold text-[#1A1A18]">{typeof row.amount === 'number' ? formatCLP(row.amount) : '—'}</div>
                                             <div className="mt-0.5">{getMovementTypeTag(row.type)}</div>
+                                            {(row.facturaSeed || row.cotizacion) && (
+                                                <div className={`mt-1 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold text-white ${row.facturaSeed ? 'bg-[#16A34A]' : 'bg-[#1D4ED8]'}`}>
+                                                    {row.facturaSeed ? 'FAC' : 'COT'}
+                                                </div>
+                                            )}
                                         </div>
                                     </button>
                                 ))}
@@ -617,13 +859,16 @@ export default function ConciliacionesPage() {
                             <span className={`mt-1 text-lg font-bold text-[#1A6B3C] transition-opacity ${selectedRow ? 'opacity-100' : 'opacity-0'}`}>→</span>
                         </div>
 
-                        <section className="overflow-hidden rounded-lg border border-[#E4E4DF] bg-white">
+                        <section className={`overflow-hidden rounded-lg border bg-white transition-all duration-500 ${flashMatch ? 'border-[#16A34A] bg-[#EAF5EE]' : 'border-[#E4E4DF]'}`}>
                             <div className="flex items-center justify-between border-b border-[#E4E4DF] bg-[#FAFAF8] px-4 py-3">
                                 <span className="flex items-center gap-1.5 text-[11.5px] font-bold uppercase text-[#1A1A18]">
                                     <FileTextOutlined />
                                     Documentos
                                 </span>
-                                <span className="font-mono text-[11px] text-[#A8A8A2]">{rightTitle}</span>
+                                <span className="flex items-center gap-1.5 font-mono text-[11px] text-[#A8A8A2]">
+                                    {loadingDocumentos && <Spin size="small" />}
+                                    {loadingDocumentos ? 'Cargando documentos…' : rightTitle}
+                                </span>
                             </div>
 
                             <div className="min-h-[min(52vh,560px)] overflow-y-auto p-4">
@@ -667,10 +912,23 @@ export default function ConciliacionesPage() {
                                             <Button type="primary" className="h-10 flex-1 border-none bg-[#1D4ED8] text-white! font-bold" icon={<CheckCircleOutlined />} loading={conciliandoId === selectedRow.id} disabled={conciliandoId !== null && conciliandoId !== selectedRow.id} onClick={handleConciliar}>
                                                 Conciliar
                                             </Button>
-                                            <Button onClick={handleVerDetalle} loading={loadingDetalleDoc}>Ver detalle</Button>
+                                            <button
+                                                type="button"
+                                                onClick={handleVerDetalle}
+                                                disabled={loadingDetalleDoc}
+                                                className="inline-flex items-center gap-1.5 rounded border border-[#370776] px-4 py-2 text-[13px] font-semibold text-[#370776] transition-colors hover:bg-[#F3EEFF] disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {loadingDetalleDoc ? <Spin size="small" /> : null}
+                                                Ver detalle
+                                            </button>
                                         </div>
                                     </div>
-                                ) : <div className="flex flex-col items-center px-6 py-14 text-center text-[#A8A8A2]"><FileTextOutlined className="mb-3.5 text-[52px] opacity-25" /><p className="text-[12.5px]">Sin documentos encontrados.</p></div>}
+                                ) : loadingDocumentos ? (
+                                    <div className="flex flex-col items-center px-6 py-14 text-center text-[#A8A8A2]">
+                                        <Spin size="default" />
+                                        <p className="mt-3 text-[12.5px]">Cargando facturas y cotizaciones…</p>
+                                    </div>
+                                ) : <div className="flex flex-col items-center px-6 py-14 text-center text-[#A8A8A2]"><FileTextOutlined className="mb-3.5 text-[52px] opacity-25" /><p className="text-[12.5px]">Sin documentos encontrados para este monto.</p></div>}
                             </div>
                         </section>
                     </div>
@@ -678,11 +936,35 @@ export default function ConciliacionesPage() {
             )}
 
             <Modal
-                title={detalle ? `Transferencia · ${detalle.id || '—'}` : 'Detalle'}
+                title={detalle ? `Transferencia · ${detalle.counterpartyName || detalle.id || '—'}` : 'Detalle'}
                 open={!!detalle}
                 onCancel={() => { setDetalleRow(null); setDetalleConciliacionHistorial(null); setDetalleDoc(null); }}
-                footer={null}
-                width={1040}
+                footer={!detalleConciliacionHistorial && selectedRow ? (
+                    <div className="flex justify-end gap-2 pt-1">
+                        <Button
+                            type="primary"
+                            icon={<CheckCircleOutlined />}
+                            loading={conciliandoId === selectedRow?.id}
+                            disabled={conciliandoId !== null}
+                            onClick={() => {
+                                setDetalleRow(null);
+                                setDetalleDoc(null);
+                                handleConciliar();
+                            }}
+                            style={{ background: '#1D4ED8', borderColor: '#1D4ED8', color: '#fff' }}
+                        >
+                            Conciliar
+                        </Button>
+                        <button
+                            type="button"
+                            onClick={() => { setDetalleRow(null); setDetalleConciliacionHistorial(null); setDetalleDoc(null); }}
+                            className="rounded border border-[#E4E4DF] px-4 py-1.5 text-[13px] font-semibold text-[#6B6B65] hover:bg-[#F5F5F2] transition-colors"
+                        >
+                            Cerrar
+                        </button>
+                    </div>
+                ) : null}
+                width="min(1040px, 94vw)"
                 styles={{ body: { paddingTop: 12 } }}
             >
                 {detalle && (
@@ -729,7 +1011,7 @@ export default function ConciliacionesPage() {
                                 const razonSocial = detalleDoc.cliente?.razon_social ?? detalleDoc._matchDoc?.cliente ?? '—';
                                 const rut = formatChileRutDisplay(detalleDoc.rutcli ?? detalleDoc._matchDoc?.rut);
                                 const fecha = detalleDoc.fecha ? dayjs(detalleDoc.fecha).format('DD/MM/YYYY') : '—';
-                                const total = detalleDoc.totales?.totgen ?? detalleDoc._matchDoc?.monto;
+                                const total = detalleDoc.totales?.totgen ?? detalleDoc.totgen ?? detalleDoc._matchDoc?.monto;
                                 const items = Array.isArray(detalleDoc.detalle) ? detalleDoc.detalle : [];
                                 return (
                                     <div className="space-y-3">
@@ -774,47 +1056,50 @@ export default function ConciliacionesPage() {
                                                                 );
                                                             })}
                                                         </tbody>
-                                                        {detalleDoc.totales && (
-                                                            <tfoot>
-                                                                {typeof detalleDoc.totales.neto === 'number' && (
-                                                                    <tr className="bg-[#FAFAF8] text-[#6B6B65]">
-                                                                        <td colSpan={3} className="border-t border-[#E4E4DF] px-3 py-1.5 text-right">Subtotal neto</td>
-                                                                        <td className="border-t border-[#E4E4DF] px-3 py-1.5 text-right font-mono">{formatCLP(detalleDoc.totales.neto)}</td>
-                                                                    </tr>
-                                                                )}
-                                                                {typeof detalleDoc.totales.iva === 'number' && (
-                                                                    <tr className="bg-[#FAFAF8] text-[#6B6B65]">
-                                                                        <td colSpan={3} className="px-3 py-1.5 text-right">IVA 19%</td>
-                                                                        <td className="px-3 py-1.5 text-right font-mono">{formatCLP(detalleDoc.totales.iva)}</td>
-                                                                    </tr>
-                                                                )}
-                                                                {typeof detalleDoc.totales.totgen === 'number' && (
-                                                                    <tr style={{ background: colorBg }}>
-                                                                        <td colSpan={3} className="border-t border-[#E4E4DF] px-3 py-2 text-right font-bold">TOTAL</td>
-                                                                        <td className="border-t border-[#E4E4DF] px-3 py-2 text-right font-mono font-bold" style={{ color: colorText }}>
-                                                                            {formatCLP(detalleDoc.totales.totgen)}
-                                                                        </td>
-                                                                    </tr>
-                                                                )}
-                                                            </tfoot>
-                                                        )}
+                                                        {(() => {
+                                                            const t = detalleDoc.totales;
+                                                            const totgenVal = t?.totgen ?? detalleDoc.totgen ?? null;
+                                                            if (totgenVal == null && !t) return null;
+                                                            return (
+                                                                <tfoot>
+                                                                    {typeof (t?.subtotnet ?? t?.neto) === 'number' && (
+                                                                        <tr className="bg-[#FAFAF8] text-[#6B6B65]">
+                                                                            <td colSpan={3} className="border-t border-[#E4E4DF] px-3 py-1.5 text-right">Subtotal neto</td>
+                                                                            <td className="border-t border-[#E4E4DF] px-3 py-1.5 text-right font-mono">{formatCLP(t.subtotnet ?? t.neto)}</td>
+                                                                        </tr>
+                                                                    )}
+                                                                    {typeof t?.totiva === 'number' && (
+                                                                        <tr className="bg-[#FAFAF8] text-[#6B6B65]">
+                                                                            <td colSpan={3} className="px-3 py-1.5 text-right">IVA 19%</td>
+                                                                            <td className="px-3 py-1.5 text-right font-mono">{formatCLP(t.totiva)}</td>
+                                                                        </tr>
+                                                                    )}
+                                                                    {typeof totgenVal === 'number' && (
+                                                                        <tr style={{ background: colorBg }}>
+                                                                            <td colSpan={3} className="border-t border-[#E4E4DF] px-3 py-2 text-right font-bold">TOTAL</td>
+                                                                            <td className="border-t border-[#E4E4DF] px-3 py-2 text-right font-mono font-bold" style={{ color: colorText }}>
+                                                                                {formatCLP(totgenVal)}
+                                                                            </td>
+                                                                        </tr>
+                                                                    )}
+                                                                </tfoot>
+                                                            );
+                                                        })()}
                                                     </table>
                                                 </div>
                                             </div>
                                         )}
 
                                         {items.length === 0 && (
-                                            <p className="text-sm text-[#A8A8A2]">Sin líneas de detalle disponibles.</p>
+                                            <p className="text-sm text-[#A8A8A2]">
+                                                {detalleDoc._fromStoredSeed
+                                                    ? 'Este documento no está disponible en la base de datos local. Se muestran los datos guardados al momento de conciliar.'
+                                                    : 'Sin líneas de detalle disponibles.'}
+                                            </p>
                                         )}
                                     </div>
                                 );
-                            })() : cotizacionRow ? (
-                                <Descriptions size="small" column={1} bordered>
-                                    <Descriptions.Item label="ID">{dash(cotizacionRow.id)}</Descriptions.Item>
-                                    <Descriptions.Item label="Cliente">{dash(cotizacionRow.cliente)}</Descriptions.Item>
-                                    <Descriptions.Item label="Monto">{typeof cotizacionRow.monto === 'number' ? formatCLP(cotizacionRow.monto) : '—'}</Descriptions.Item>
-                                </Descriptions>
-                            ) : detalleFactura || detalleSeed ? (
+                            })() : detalleFactura || detalleSeed ? (
                                 <div className="space-y-3">
                                     {detalleFactura && (
                                         <div className="rounded-lg border border-[#86EFAC] bg-[#F0FDF4] p-3">

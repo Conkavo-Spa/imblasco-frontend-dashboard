@@ -40,6 +40,10 @@ class ConciliationService {
         return instance.get('/conciliations/historial', { params });
     }
 
+    deleteConciliacion(id) {
+        return instance.delete(`/conciliations/${encodeURIComponent(id)}`);
+    }
+
     /**
      * @param {string} cotizacionId
      * @param {{ fecha: string, monto: number, hora?: string }} payload
@@ -59,6 +63,16 @@ class ConciliationService {
     getCotizacionDetalle(cotizacionId) {
         return instance.get(
             `/conciliations/cotizaciones/${encodeURIComponent(cotizacionId)}/detalle`
+        );
+    }
+
+    /**
+     * @param {string | number} facturaId
+     * @returns Factura completa con array detalle (productos, tras correr enrich_facturas_detalle.js)
+     */
+    getFacturaDetalle(facturaId) {
+        return instance.get(
+            `/conciliations/facturas/${encodeURIComponent(facturaId)}/detalle`
         );
     }
 }

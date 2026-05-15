@@ -10,7 +10,7 @@ function mapFactura(doc) {
     return {
         id: String(doc.factura),
         cotizacion_ref: doc.cotizacion_ref ?? null,
-        cliente: null, // Las facturas no tienen datos de cliente directamente
+        cliente: doc.razon_social ?? null,
         rut: doc.rutcli ? String(doc.rutcli) : null,
         fecha,
         hora: null,
